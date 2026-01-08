@@ -15,10 +15,26 @@ export default function MintConfirm() {
   const ar = useMemo(() => params.get('ar') ?? '', [params])
   const [state, setState] = useState<MintState>('idle')
   const [message, setMessage] = useState<string>('')
-  const [recipient, setRecipient] = useState<string>('')
+  const [recipient, setRecipient] = useState<string>(() => params.get('recipient') ?? '')
   const { config } = useChainConfig()
   const navigate = useNavigate()
 
+  const polkadotAddressRegex = useMemo(() => /^1[1-9A-HJ-NP-Za-km-z]{46,47}$/, [])
+  const validateAddress = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return '地址不能为空'
+    if (trimmed.startsWith('0x')) return '不支持以太坊地址，请使用波卡(Polkadot)地址'
+    if (!polkadotAddressRegex.test(trimmed)) return '地址格式不正确，请填写以 1 开头的波卡地址'
+    return null
+  }
+
+  const sha256Hex = async (text: string) => {
+    const enc = new TextEncoder()
+    const data = enc.encode(text)
+    const digest = await crypto.subtle.digest('SHA-256', data)
+    const bytes = new Uint8Array(digest)
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
   const buildSuccessPath = () => {
     const qs: string[] = []
     if (bookIdRaw) qs.push(`book_id=${encodeURIComponent(bookIdRaw)}`)
@@ -28,12 +44,14 @@ export default function MintConfirm() {
 
   useEffect(() => {
     try {
-      const addr = localStorage.getItem('selectedAddress')
-      if (addr) {
-        setRecipient(addr)
+      if (!recipient) {
+        const addr = localStorage.getItem('selectedAddress')
+        if (addr) {
+          setRecipient(addr)
+        }
       }
     } catch {}
-  }, [])
+  }, [recipient])
 
   const handleMint = async () => {
     if (!code) {
@@ -117,10 +135,13 @@ export default function MintConfirm() {
       setMessage('未获取到 Secret Code')
       return
     }
-    if (!recipient) {
-      setState('error')
-      setMessage('请先填写接收地址')
-      return
+    {
+      const err = validateAddress(recipient)
+      if (err) {
+        setState('error')
+        setMessage(err)
+        return
+      }
     }
     if (!config.contractAddress || !config.abiUrl) {
       setState('error')
@@ -140,13 +161,15 @@ export default function MintConfirm() {
         const dataU8a = msg.toU8a([code])
         dataHex = '0x' + Array.from(dataU8a).map((b) => b.toString(16).padStart(2, '0')).join('')
       }
+      const codeHash = await sha256Hex(code)
       const payload = {
         dest: config.contractAddress,
         value: '0',
         gasLimit: '0',
         storageDepositLimit: null as string | null,
         dataHex,
-        signer: recipient
+        signer: recipient,
+        codeHash
       }
       const url = `${BACKEND_URL}/relay/mint${bookIdRaw ? `?book_id=${encodeURIComponent(bookIdRaw)}` : ''}`
       const resp = await fetch(url, {
@@ -159,11 +182,14 @@ export default function MintConfirm() {
         setMessage('后端处理失败')
         return
       }
-      const { status, txHash } = await resp.json()
+      const { status, txHash, error } = await resp.json()
       if (status === 'submitted') {
         setState('in-block')
         setMessage(`已提交，交易哈希 ${txHash || ''}`)
         navigate(buildSuccessPath())
+      } else if (status === 'error' && typeof error === 'string') {
+        setState('error')
+        setMessage(error)
       } else {
         setState('error')
         setMessage('提交失败')
@@ -183,20 +209,21 @@ export default function MintConfirm() {
         <div className="mt-6 space-y-4">
           <div className="space-y-2">
             <div className="text-sm text-white/70">
-              没有钱包？点击此处下载{' '}
-              <a href="https://novawallet.io" target="_blank" rel="noreferrer" className="text-primary hover:text-primary/80 underline">
-                Nova Wallet
+              下载安装使用说明书：推荐安装{' '}
+              <a href="https://talisman.xyz" target="_blank" rel="noreferrer" className="text-primary hover:text-primary/80 underline">
+                Talisman
               </a>
-              /
+              {' '}或{' '}
               <a href="https://subwallet.app" target="_blank" rel="noreferrer" className="text-primary hover:text-primary/80 underline ml-1">
                 SubWallet
               </a>
+              ，妥善保存助记词，并复制以 1 开头的地址。
             </div>
             <div>
               <div className="text-sm text-white/70 mb-1">已安装钱包？请输入您的接收地址</div>
               <input
                 className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-primary/60 font-mono text-sm"
-                placeholder="粘贴或输入您的链上地址"
+                placeholder="请输入您的波卡钱包地址（以 1 开头）"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
               />
