@@ -18,7 +18,7 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
 
 ### 1.1 收银台（读者侧）
 
-完整用户流：**扫码 → 支付 / 免 Gas Mint → 成功页 → 解锁内容 / 继续扫码**。
+完整用户流：**扫码 → 普通 / 免 Gas Mint → 成功页 → 解锁内容 / 继续扫码**。
 
 - 扫码页 `/scan`
   - 调用摄像头扫描实体书上的 Secret Code（二维码）
@@ -26,12 +26,13 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
   - 扫描成功后自动跳转到 `/mint-confirm?code=...`
 
 - 支付 Mint 页 `/mint-confirm`
-  - 展示当前 Secret Code
+  - 展示当前 Secret Code 与可选参数（如 `book_id`、`ar`）
+  - 不强制用户一开始就连接钱包；支持“直接填接收地址”完成免 Gas
   - 两种铸造方式：
-    - 普通铸造：调用 Polkadot{.js} 钱包，直接向 Jessie 的 Ink! 合约发送 `mint(code)` 交易
-    - 免 Gas 铸造：前端只做 **签名授权**，交易由后台代付 Gas（元交易）
+    - 使用钱包直接 Mint：调用 Polkadot{.js} 钱包，向 Ink! 合约发送 `mint(code)` 交易（用户自费 Gas）
+    - 免 Gas 铸造：用户输入“接收地址”，前端编码合约调用数据并 POST `/relay/mint`，由后端代付 Gas 完成交易
   - 支持加载状态：发送中 / 区块确认中 / 错误提示
-  - 铸造成功后**自动跳转**到成功页 `/success`
+  - 铸造成功后自动跳转到成功页 `/success`
 
 - 成功展示页 `/success`
   - 展示一个 NFT 勋章占位图和简洁的祝贺文案
@@ -223,9 +224,10 @@ go run main.go
 - 文件：`src/pages/MintConfirm.tsx`
 - 功能：
   - 展示从 URL 中解析的 `code` 与可选参数 `book_id`、`ar`
+  - 不强制连接钱包：提供下载链接（Nova Wallet / SubWallet）与“接收地址”输入框
   - 按钮：
-    - 「确认 Mint」：直接使用扩展钱包发起 `mint(code)`
-    - 「免 Gas 铸造」：走元交易流程 `mint_meta`
+    - 「使用钱包直接 Mint」：通过扩展钱包调用合约 `mint(code)`（用户自费 Gas）
+    - 「确认领取」（免 Gas）：仅填写接收地址，前端编码 `mint(code)` 的 dataHex 并 POST `/relay/mint`，由后端代付 Gas
   - 状态展示：发送中 / 区块确认中 / 错误提示
   - 成功后自动跳转至 `/success?book_id=...&ar=...`
 
@@ -236,8 +238,12 @@ go run main.go
   - 展示 NFT 勋章占位图与成功文案
   - 从 URL 中读取：
     - `book_id`：书籍编号
-    - `ar`：Arweave 交易 ID
+    - `ar`：Arweave 交易 ID（如存在则优先使用）
   - 读取当前钱包地址（优先使用 `localStorage.selectedAddress`）
+  - Arweave 映射与网关：
+    - 常量 `ARWEAVE_GATEWAY = "https://arweave.net/"`
+    - 内置 `BOOKS` 映射：`book_id → txId`（例如 Book 1 映射为 `uxtt46m7gTAAcS9pnyh8LkPErCr4PFJiqYjQnWcbzBI`）
+    - 计算规则：`arTxId ? ARWEAVE_GATEWAY + arTxId : ARWEAVE_GATEWAY + BOOKS[book_id].txId`
   - 按钮：
     - 「验证访问权限」：调用合约 `has_access(address, book_id)`
     - 验证通过后：
@@ -294,7 +300,7 @@ go run main.go
 
 ### 6.1 POST `/relay/mint`
 
-用途：元交易转发。前端构造好 `Contracts.call` 的编码数据，由后端使用平台账户代签名和发送。
+用途：免 Gas / 无签名的中继入口。前端编码合约调用数据（当前实现为 `mint(code)` 的 dataHex），后端使用平台账户代付 Gas 并提交交易。
 
 #### 请求体（JSON）
 
@@ -302,14 +308,14 @@ go run main.go
 {
   "dest": "合约地址（SS58）",
   "value": "0",
-  "gasLimit": "估算得到的 gas（字符串）",
-  "storageDepositLimit": "可选，存储押金上限（字符串或 null）",
-  "dataHex": "0x 前缀的 call 数据十六进制字符串",
-  "signer": "用户地址（用于风控和日志）"
+  "gasLimit": "0 或估算值字符串",
+  "storageDepositLimit": "字符串或 null",
+  "dataHex": "0x 前缀的合约调用数据（当前为 mint(code) 的编码）",
+  "signer": "用户地址（用于风控与日志）"
 }
 ```
 
-> 实际上 `gasLimit` 和 `storageDepositLimit` 会在链端再次计算，但前端会先用合约 `query` 估算一遍。
+> 说明：当前 Demo 简化为“无签名免 Gas”，后端代付 Gas 并调用合约；若需“签名 + mint_meta + 中继”的严格校验方案，可在前端改为签名消息并编码 `mint_meta(...)`，后端进行校验后再提交。
 
 #### URL 查询参数
 
@@ -389,18 +395,65 @@ go run main.go
 1. 打开 DApp，点击首页「扫描 Secret Code」进入 `/scan`
 2. 授权浏览器使用摄像头，扫描实体书封底的二维码
 3. 扫描成功 → 自动跳转到 `/mint-confirm?code=...`
-4. 选择：
-   - 普通「确认 Mint」：弹出 Polkadot{.js} 扩展确认交易，用户自付 Gas
-   - 「免 Gas 铸造」：仅签名授权消息，由平台账户代付 Gas
+4. 在确认页：
+   - 可选择使用扩展钱包直接 Mint（用户自费 Gas）
+   - 或不连接扩展，仅填写“接收地址”，点击「确认领取」（免 Gas）由后端代付 Gas 完成
 5. 交易成功 → 自动跳转 `/success?book_id=...&ar=...`
-6. 在成功页点击「验证访问权限」，通过后：
-   - 打开 Arweave 正文内容
+6. 成功页点击「验证访问权限」，通过后：
+   - 跳转 Arweave 正文内容（优先用 `ar`，否则用 BOOKS 映射）
    - 加入 Matrix 私域社群
 7. 如果有下一本书，点击「继续扫码下一本」再次进入 `/scan`
 
 ---
 
-## 9. 典型使用流程（作者 / 出版社视角）
+## 9. 部署与上线（示例：Nginx + Go 后端）
+
+### 9.1 构建前端静态资源
+
+```bash
+npm install
+npm run build
+```
+
+构建完成后，前端静态文件位于 `dist/` 目录。
+
+> 生产环境建议将 `src/config/backend.ts` 中的 `BACKEND_URL` 修改为后端真实公网地址（或同域反代）。
+
+### 9.2 启动 Go Relay Server（可选但建议）
+
+在服务器上准备好 Go 与 Redis，然后：
+
+```bash
+cd backend
+export WS_ENDPOINT=wss://ws.azero.dev
+export RELAYER_SEED="你的平台账户种子"
+export REDIS_ADDR="127.0.0.1:6379"
+go run main.go
+```
+
+默认监听 `:8080`。
+
+### 9.3 使用 Nginx 托管前端并反向代理后端
+
+将 `dist/` 上传到服务器（例如 `/var/www/whale-vault`），站点配置示例：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain-or-ip;
+    root /var/www/whale-vault;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+    location /relay/   { proxy_pass http://127.0.0.1:8080/relay/; }
+    location /metrics/ { proxy_pass http://127.0.0.1:8080/metrics/; }
+}
+```
+
+将前端 `BACKEND_URL` 指向同域地址（例如 `http://your-domain-or-ip`），避免跨域。
+
+---
+
+## 10. 典型使用流程（作者 / 出版社视角）
 
 1. 打开 DApp，连接钱包，使用作者 / 出版社账户登录
 2. 进入管理后台 `/admin/overview` 查看数据总览
@@ -411,7 +464,7 @@ go run main.go
 
 ---
 
-## 10. 后续可扩展方向
+## 11. 后续可扩展方向
 
 本 README 基于当前实现状态总结，后续可以在此基础上扩展：
 
