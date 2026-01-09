@@ -52,7 +52,7 @@ export default function MintConfirm() {
         setMessage('')
         if (!hashCode) {
           setVerifyState('invalid')
-          setMessage('未获取到兑换码信息')
+          setMessage('未获取到领取信息')
           return
         }
         const url = `${BACKEND_URL}/secret/verify?codeHash=${encodeURIComponent(hashCode)}`
@@ -61,11 +61,11 @@ export default function MintConfirm() {
         const ok = resp.ok && body?.ok === true
         setVerifyState(ok ? 'valid' : 'invalid')
         if (!ok) {
-          setMessage('兑换码无效，无法领取')
+          setMessage('当前链接无效，无法领取')
         }
       } catch {
         setVerifyState('invalid')
-        setMessage('兑换码验证失败')
+        setMessage('领取资格验证失败')
       }
     })()
   }, [hashCode])
@@ -73,7 +73,7 @@ export default function MintConfirm() {
   const submit = async () => {
     if (verifyState !== 'valid') {
       setSubmitState('error')
-      setMessage('兑换码无效，无法领取')
+      setMessage('当前链接无效，无法领取')
       return
     }
     const err = validateAddress(recipient)
@@ -132,7 +132,7 @@ export default function MintConfirm() {
         <div className="min-h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-8 text-center space-y-4">
             <div className="text-xl font-semibold text-red-300">无法领取</div>
-            <div className="text-sm text-white/70">{message || '兑换码无效或已失效'}</div>
+            <div className="text-sm text-white/70">{message || '当前链接无效或已失效'}</div>
             <Link
               to="/"
               className="inline-flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 px-4 py-2 text-sm text-white/80 transition"
@@ -160,7 +160,7 @@ export default function MintConfirm() {
 
           {verifyState === 'verifying' ? (
             <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
-              正在验证兑换码...
+              正在验证领取资格...
             </div>
           ) : (
             <div className="space-y-4">
