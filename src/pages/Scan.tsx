@@ -1,17 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { decodeAddress, encodeAddress } from '@polkadot/util-crypto'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { BACKEND_URL } from '../config/backend'
 
 export default function Scan() {
   const navigate = useNavigate()
-  const [recipient, setRecipient] = useState<string>('')
-  const [error, setError] = useState<string>('')
   const [showScanner, setShowScanner] = useState<boolean>(false)
   const [secretCode, setSecretCode] = useState<string>('')
-  const [verifying, setVerifying] = useState<boolean>(false)
-  const base58LikeRegex = useMemo(() => /^[1-9A-HJ-NP-Za-km-z]+$/, [])
+  const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'success' | 'error'>('idle')
+  const [message, setMessage] = useState<string>('')
+  const hasWallet = useMemo(() => {
+    try {
+      return !!localStorage.getItem('selectedAddress')
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     try {
@@ -19,29 +23,6 @@ export default function Scan() {
       if (saved) setSecretCode(saved)
     } catch {}
   }, [])
-
-  const validateAddress = (value: string) => {
-    const trimmed = value.trim()
-    if (!trimmed) return '地址不能为空'
-    if (trimmed.startsWith('0x')) return '不支持以太坊地址，请使用波卡(Polkadot)地址'
-    if (!base58LikeRegex.test(trimmed)) return '无效的波卡地址，请检查后重新输入'
-    try {
-      decodeAddress(trimmed)
-    } catch {
-      return '无效的波卡地址，请检查后重新输入'
-    }
-    return null
-  }
-
-  const normalizeToPolkadot = (addr: string) => {
-    try {
-      const pub = decodeAddress(addr.trim())
-      const polkadotAddr = encodeAddress(pub, 0)
-      return polkadotAddr
-    } catch {
-      return addr.trim()
-    }
-  }
 
   const sha256Hex = async (text: string) => {
     const enc = new TextEncoder()
@@ -60,104 +41,120 @@ export default function Scan() {
     return body?.ok === true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const err = validateAddress(recipient)
-    if (err) {
-      setError(err)
-      return
-    }
-    if (!secretCode.trim()) {
-      setError('请先扫码获取 Secret Code')
+  const proceed = async (raw: string) => {
+    const code = raw.trim()
+    if (!code) {
+      setStatus('error')
+      setMessage('未获取到兑换码')
       return
     }
     try {
-      setVerifying(true)
-      setError('')
-      const ok = await verifySecretCode(secretCode.trim())
+      setStatus('verifying')
+      setMessage('验证中...')
+      const ok = await verifySecretCode(code)
       if (!ok) {
-        setError('兑换码无效，无法领取 NFT')
+        try {
+          localStorage.removeItem('secretCode')
+        } catch {}
+        setStatus('error')
+        setMessage('兑换码无效，无法领取 NFT')
         return
       }
-      const normalized = normalizeToPolkadot(recipient)
-      navigate(`/mint-confirm?code=${encodeURIComponent(secretCode.trim())}&recipient=${encodeURIComponent(normalized)}`)
+      setStatus('success')
+      setMessage('验证通过，正在进入 Mint...')
+      try {
+        localStorage.removeItem('secretCode')
+      } catch {}
+      navigate(`/mint-confirm?code=${encodeURIComponent(code)}`)
     } catch {
-      setError('验证失败，请稍后重试')
-    } finally {
-      setVerifying(false)
+      setStatus('error')
+      setMessage('验证失败，请稍后重试')
     }
   }
 
+  useEffect(() => {
+    if (!secretCode) return
+    proceed(secretCode)
+  }, [secretCode])
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-xl font-semibold mb-4">填写信息领取 NFT</h1>
-      <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-5">
-        <div className="text-sm text-white/70">
-          下载安装使用说明书：推荐安装{' '}
-          <a href="https://talisman.xyz" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">
-            Talisman
-          </a>{' '}
-          或{' '}
-          <a href="https://subwallet.app" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">
-            SubWallet
-          </a>{' '}
-          插件，妥善保存助记词，并复制以 1 开头的地址。
-        </div>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <div className="text-sm text-white/70 mb-1">波卡钱包地址（必填）</div>
-            <input
-              className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-primary/60 font-mono text-sm"
-              placeholder="请输入您的波卡钱包地址（以 1 开头）"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              onBlur={() => {
-                if (!recipient.trim()) return
-                const err = validateAddress(recipient)
-                if (err) {
-                  setError(err)
-                  return
-                }
-                const normalized = normalizeToPolkadot(recipient)
-                setRecipient(normalized)
-              }}
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-sm text-white/70">Secret Code</div>
+    <div className="mx-auto max-w-2xl px-4">
+      <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-center text-center">
+        <div className="space-y-4">
+          <div className="mx-auto w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8">
+            <div className="text-base text-white/80">请点击下方按钮进行扫码</div>
+            <div className="mt-5 flex flex-col items-center gap-4">
               <button
                 type="button"
-                className="text-xs px-2 py-1 rounded-full border border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 transition"
-                onClick={() => setShowScanner(true)}
+                className="group relative h-32 w-32 sm:h-36 sm:w-36 rounded-2xl bg-primary text-background shadow-glow transition active:scale-95 hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary/60"
+                onClick={() => {
+                  setMessage('')
+                  setStatus('scanning')
+                  setShowScanner(true)
+                }}
+                disabled={status === 'verifying'}
               >
-                扫码获取
+                <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/10 transition" />
+                <div className="relative flex h-full w-full flex-col items-center justify-center gap-2">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="opacity-95">
+                    <path
+                      d="M7 3H5a2 2 0 0 0-2 2v2m18 0V5a2 2 0 0 0-2-2h-2M7 21H5a2 2 0 0 1-2-2v-2m18 0v2a2 2 0 0 1-2 2h-2"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M7 12h10M12 7v10"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="text-base font-semibold tracking-wide">点击扫码</div>
+                </div>
               </button>
-            </div>
-            <div className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 font-mono text-sm break-all">
-              {secretCode ? secretCode : <span className="text-white/50">请扫码获取</span>}
+
+              <div className="flex flex-col items-center gap-2">
+                <svg className="h-5 w-5 text-primary/80 animate-bounce" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5v12m0 0l-5-5m5 5l5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <div className="text-base text-white/70">
+                  {status === 'verifying'
+                    ? '正在校验兑换码...'
+                    : status === 'success'
+                      ? '校验通过，准备进入 Mint'
+                      : status === 'error'
+                        ? '校验失败，请重新扫码'
+                        : !hasWallet
+                          ? '建议先连接钱包（右上角）'
+                          : '准备就绪'}
+                </div>
+                {(message || status === 'verifying') && (
+                  <div className={`text-base ${status === 'error' ? 'text-red-400' : status === 'success' ? 'text-emerald-400' : 'text-white/70'}`}>
+                    {message || '验证中...'}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          {error && <div className="text-sm text-red-400">{error}</div>}
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary px-4 py-2 transition shadow-glow"
-            disabled={verifying}
-          >
-            {verifying ? '验证中...' : '前往确认页'}
-          </button>
-        </form>
+        </div>
       </div>
       {showScanner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowScanner(false)} />
-          <div className="relative w-full max-w-sm rounded-xl border border-white/10 bg-background p-4 space-y-3 shadow-glow">
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-background p-4 space-y-3 shadow-glow">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">扫码获取 Secret Code</div>
+              <div className="flex items-center gap-2 text-base font-medium">
+                <span>扫码中</span>
+                <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+              </div>
               <button
                 type="button"
                 className="text-xs text-white/60 hover:text-white"
-                onClick={() => setShowScanner(false)}
+                onClick={() => {
+                  setShowScanner(false)
+                  setStatus('idle')
+                }}
               >
                 关闭
               </button>
@@ -169,6 +166,7 @@ export default function Scan() {
                   const value = first?.rawValue ?? ''
                   if (value) {
                     setShowScanner(false)
+                    setStatus('idle')
                     const trimmed = value.trim()
                     if (/^https?:\/\//i.test(trimmed)) {
                       window.location.href = trimmed
@@ -181,7 +179,7 @@ export default function Scan() {
                 constraints={{ facingMode: 'environment' }}
               />
             </div>
-            <div className="text-xs text-white/60">将摄像头对准书上的二维码，将自动跳转并读取 Code。</div>
+            <div className="text-base text-white/70">将摄像头对准书上的二维码</div>
           </div>
         </div>
       )}

@@ -223,44 +223,67 @@ go run main.go
   - 左侧卡片：项目简介 + 「扫描 Secret Code」按钮（跳转 `/scan`）
   - 右侧卡片：可扩展的销量展示组件（`SalesBoard`）
 
-### 4.2 填写页 `/scan`
+### 4.2 Secret Code 路由入口 `/whale_valut/:code` / `/whale_vault/:code`
+
+
+- 文件：`src/pages/SecretCodeGate.tsx`
+- 功能：
+  - 作为实体书二维码的落地页。二维码通常编码形如 `http://198.55.109.102/whale_valut/{secretCode}`（兼容历史拼写 `/whale_vault/{secretCode}`）。
+  - 从 URL path 中读取 `code` 参数，并做 `decodeURIComponent` + `trim` 处理。
+  - 将解析到的 Secret Code 写入 `localStorage.secretCode`，供后续 `/scan` 页自动读取。
+  - 如未获取到合法的 `code`，直接重定向到 `/scan`。
+  - 正常情况下立刻 `navigate('/scan', { replace: true })`，由扫码页统一触发后续校验与 Mint 流程。
+
+### 4.3 扫码页 `/scan`
 
 - 文件：`src/pages/Scan.tsx`
 - 功能：
-  - 作为读者入口页，以表单方式收集地址与 Secret Code
-  - 提供表单输入：
-    - 波卡钱包地址（必填）
-    - Secret Code（如有，可手填或扫码填入）
-  - 地址校验与智能转换：
-    - 使用 `decodeAddress` 判断地址是否合法
-    - 自动将任意合法 Substrate 地址转换为以 `1` 开头的 Polkadot 主网地址
-  - Secret Code 扫码填入：
-    - 点击 Secret Code 标题旁的「扫码填入」按钮，弹出摄像头扫码弹窗
-    - 使用 `@yudiel/react-qr-scanner` 扫描实体书二维码，将结果自动写入输入框
-  - 表单提交后跳转：`/mint-confirm?code={encodedCode}&recipient={normalizedAddress}`
+  - 作为读者可见的入口页，不再展示任何输入框，仅保留一个大号「点击扫码」按钮。
+  - 通过读取 `localStorage.selectedAddress` 粗略判断用户是否已在右上角连接钱包，用于展示“建议先连接钱包”等提示文案。
+- Secret Code 自动校验：
+  - 页面挂载时尝试从 `localStorage.secretCode` 读取兑换码。
+  - 读取到后计算 SHA-256 哈希，并调用后端 `GET /secret/verify?codeHash=...` 校验兑换码是否有效。
+  - 校验通过时，更新状态为“验证通过，正在进入 Mint...”，并自动跳转至 `/mint-confirm?code={encodeURIComponent(code)}`。
+  - 校验失败时会清空本地的 `secretCode`，并展示「兑换码无效，无法领取 NFT」等错误提示。
+- 扫码按钮与浮层：
+  - 页面中心提供一个 32×32（小屏）/ 36×36（大屏）的「点击扫码」按钮，带有阴影、悬停放大、点击缩放等动效，提升交互体验。
+  - 点击按钮后弹出摄像头扫码浮层，使用 `@yudiel/react-qr-scanner`。
+  - 扫码结果处理逻辑：
+    - 若结果以 `http://` 或 `https://` 开头，则直接执行 `window.location.href = trimmed`，交给浏览器访问（通常指向 `/whale_valut/{code}` 的落地页）。
+    - 否则将结果视为裸的 Secret Code，重定向至 `/whale_valut/{code}`，再由 `SecretCodeGate` 落盘并回到 `/scan`。
 
-### 4.3 Mint 确认页 `/mint-confirm`
+### 4.4 Mint 确认页 `/mint-confirm`
 
 - 文件：`src/pages/MintConfirm.tsx`
 - 功能：
-  - 展示从 URL 中解析的 `code` 与可选参数 `book_id`、`ar`
-  - 不强制连接钱包：提供钱包下载 / 使用说明（推荐 Talisman / SubWallet）与“接收地址”输入框
+  - 展示从 URL 中解析的 `code` 与可选参数 `book_id`、`ar`。
+  - 进入页面后会再次对 `code` 做一次后端校验：计算 SHA-256 哈希，并调用 `GET /secret/verify?codeHash=...`，确保兑换码有效后才允许继续 Mint 流程。
+- 接收地址与钱包：
+  - 页面不强制用户一开始就连接钱包，而是提供钱包下载 / 使用说明（推荐 Talisman / SubWallet）以及一个「接收地址」输入框。
+  - 接收地址可以来源于：
+    - URL 中透传的 `recipient` 参数（如存在）。
+    - 本地缓存的已连接钱包地址 `localStorage.selectedAddress`（页面初始化时自动尝试填充）。
+    - 用户手工输入。
+  - 在「接收地址」标题右侧，提供「使用当前钱包地址」按钮：
+    - 从 `localStorage.selectedAddress` 读取当前扩展钱包地址并填入输入框。
+    - 如尚未连接钱包，会提示用户先在右上角完成钱包连接。
   - 地址处理：
-    - 复用 `decodeAddress` / `encodeAddress`，确保使用 Polkadot 主网地址参与铸造
-    - 从 `/scan` 透传的 `recipient` 自动填入，也可手工修改
-  - 二次确认弹窗：
-    - 在调用后端 `/relay/mint` 之前，弹出 Modal：
-      - 清晰展示最终将用于铸造的 `1` 开头地址
-      - 如发生地址格式转换，给出“已自动转换为波卡主网地址”的提示
-      - 风险提示：“NFT 铸造后不可撤回，每个兑换码仅限使用一次”
-    - 提供「返回修改」与「确认领取」按钮，并在确认后联动 Loading 状态
-  - 按钮：
-    - 「使用钱包直接 Mint」：通过扩展钱包调用合约 `mint(code)`（用户自费 Gas）
-    - 「免 Gas 铸造」：填写接收地址后，前端编码 `mint(code)` 的 dataHex 并 POST `/relay/mint`，由后端代付 Gas（当前 Demo 为占位逻辑）
-  - 状态展示：发送中 / 区块确认中 / 错误提示
-  - 成功后自动跳转至 `/success?book_id=...&ar=...`
+    - 使用 `decodeAddress` / `encodeAddress` 对输入地址做合法性校验。
+    - 在免 Gas 流程中会将任意合法 Substrate 地址统一转换为以 `1` 开头的 Polkadot 主网地址，并在二次确认弹窗中展示。
+- 二次确认弹窗：
+  - 在调用后端 `/relay/mint` 之前，弹出 Modal：
+    - 清晰展示最终将用于铸造的 `1` 开头地址（转换后的主网地址）。
+    - 如发生地址格式转换，给出“已自动转换为波卡主网地址”的提示。
+    - 风险提示：“NFT 铸造后不可撤回，每个兑换码仅限一次”。
+  - 提供「返回修改」与「确认领取」按钮，并在确认后联动 Loading 状态。
+- 按钮：
+  - 「使用钱包直接 Mint」：通过扩展钱包调用合约 `mint(code)`（用户自费 Gas）。
+  - 「免 Gas 铸造」：填写接收地址后，前端编码 `mint(code)` 的 dataHex，连同 `codeHash`、`signer` 等参数 POST `/relay/mint`，由后端代付 Gas（当前 Demo 为占位逻辑，但接口已完整）。
+- 状态展示：
+  - 展示发送中 / 区块确认中 / 错误提示等状态。
+  - 成功后自动跳转至 `/success?book_id=...&ar=...`。
 
-### 4.4 成功展示页 `/success`
+### 4.5 成功展示页 `/success`
 
 - 文件：`src/pages/Success.tsx`
 - 功能：
@@ -281,7 +304,7 @@ go run main.go
     - 验证失败时给出错误提示
   - 「继续扫码下一本」：`<Link to="/scan">`，引导用户进入下一次收银流程
 
-### 4.5 管理后台
+### 4.6 管理后台
 
 - 布局：
   - `src/admin/AdminLayout.tsx`：侧边栏 + 嵌套路由结构
@@ -398,8 +421,32 @@ go run main.go
 
 前端可按时间排序、按 `book_id` 分组统计等。
 
----
+### 6.3 GET `/secret/verify`
 
+用途：对 Secret Code 做只读校验，在进入 Mint 流程前提前过滤无效 / 未登记的兑换码。当前前端在 `/scan` 与 `/mint-confirm` 中都会调用该接口。
+
+#### 请求参数（Query）
+
+- `codeHash`：必填，Secret Code 文本经 SHA-256 计算后的十六进制字符串。
+  - 前端通过浏览器 `crypto.subtle.digest('SHA-256', ...)` 计算哈希，并将结果转换为 hex。
+
+#### 响应体（JSON）
+
+```json
+{
+  "ok": true
+}
+```
+
+- `ok = true`：该兑换码在 Redis 集合 `secret:valid` 中存在，可以继续后续流程。
+- `ok = false` 且包含 `error` 字段：
+  - `invalid code`：兑换码未登记或已失效。
+  - `redis error`：后端存储访问异常。
+  - 当缺少 `codeHash` 时，接口返回 400，并在响应体中给出 `missing codeHash` 错误信息。
+
+> 说明：`/relay/mint` 在处理免 Gas 铸造时也会再次检查 `codeHash` 是否在 `secret:valid` 中，并结合一次性锁（`lockCode`）确保每个兑换码仅能成功使用一次。
+
+---
 ## 7. 与合约的主要交互点
 
 > 以下为前端使用到的合约接口名称，具体参数类型与链上实现需与实际 Ink! 合约保持一致。
@@ -430,23 +477,30 @@ go run main.go
 
 ## 8. 典型使用流程（读者视角）
 
-1. 打开 DApp，点击首页入口按钮进入 `/scan`
-2. 在填写页中：
-   - 填写或粘贴自己的波卡钱包地址（支持任意合法 Substrate 地址）
-   - 将实体书上的 Secret Code 抄写到输入框（如有）
-   - 提交后自动跳转到 `/mint-confirm?code=...&recipient=...`
-3. 在确认页：
-   - 可选择使用扩展钱包直接 Mint（用户自费 Gas）
-   - 或不连接扩展，仅填写“接收地址”，点击「免 Gas 铸造」走中继流程
+1. 通过实体书上的二维码或分享链接进入 DApp：
+   - 二维码通常为 `http://198.55.109.102/whale_valut/{secretCode}`（兼容 `/whale_vault/{secretCode}`）。
+   - 路由 `SecretCodeGate` 解析路径中的 `{secretCode}`，写入 `localStorage.secretCode`，并重定向到 `/scan`。
+   - 也可以先打开首页 `/`，点击入口按钮跳转到 `/scan`，再通过页面内的扫码按钮读取实体书上的二维码。
+2. 在扫码页 `/scan` 中：
+   - 页面加载时自动从本地读取 Secret Code，并调用 `GET /secret/verify` 对兑换码做一次校验。
+   - 校验通过后自动跳转到 `/mint-confirm?code=...`。
+   - 如需要在同一设备上读取新的实体书二维码，可点击中间的大号「点击扫码」按钮：
+     - 若扫码结果为 URL，则直接跳转到该 URL（通常再次回到 `whale_valut/{code}` 路径）。
+     - 若结果为裸的 Secret Code，则重定向至 `/whale_valut/{code}`，由 `SecretCodeGate` 统一处理。
+3. 在确认页 `/mint-confirm` 中：
+   - 页面会再次通过 `GET /secret/verify` 校验 URL 中的 `code`。
+   - 用户可以选择：
+     - 使用扩展钱包直接 Mint（用户自费 Gas）。
+     - 或不连接扩展，仅填写“接收地址”，点击「免 Gas 铸造」走中继流程。
    - 在点击免 Gas 铸造时，会弹出二次确认弹窗：
-     - 展示已转换为 `1` 开头的波卡主网地址
-     - 提示 NFT 铸造不可撤回，每个兑换码仅限一次
-4. 确认后，前端调用 `/relay/mint`，后端做唯一性锁校验并记录日志
-5. 返回成功 → 自动跳转 `/success?book_id=...&ar=...`
-6. 成功页点击「验证访问权限」，通过后：
-   - 打开 Arweave 正文内容（优先用 `ar`，否则用 BOOKS 映射）
-   - 加入 Matrix 私域社群
-7. 如果有下一本书，点击「继续扫码下一本」（链接回 `/scan`）再次进入收银流程
+     - 展示已转换为 `1` 开头的波卡主网地址（Polkadot 主网地址）。
+     - 提示 NFT 铸造不可撤回，每个兑换码仅限一次。
+4. 确认后，前端调用 `/relay/mint`，后端对 `codeHash` 做唯一性锁校验并记录日志。
+5. 成功返回后自动跳转 `/success?book_id=...&ar=...`。
+6. 在成功页点击「验证访问权限」，通过后：
+   - 打开 Arweave 正文内容（优先使用 URL 参数 `ar`，否则使用 BOOKS 映射）。
+   - 加入 Matrix 私域社群。
+7. 如有下一本书，可点击「继续扫码下一本」（链接回 `/scan`）继续进行下一次兑换。
 
 ---
 
@@ -461,39 +515,64 @@ npm run build
 
 构建完成后，前端静态文件位于 `dist/` 目录。
 
-> 生产环境建议将 `src/config/backend.ts` 中的 `BACKEND_URL` 修改为后端真实公网地址（或同域反代）。
+> 生产环境下，请将 `src/config/backend.ts` 中的 `BACKEND_URL` 修改为前端实际访问到的后端地址。以当前示例为：`http://198.55.109.102`（通过 Nginx 反向代理到本机 8080 端口）。
 
 ### 9.2 启动 Go Relay Server（可选但建议）
 
 在服务器上准备好 Go 与 Redis，然后：
 
 ```bash
+# 1. 进入后端目录
 cd backend
-export WS_ENDPOINT=wss://ws.azero.dev
-export RELAYER_SEED="你的平台账户种子"
+
+# 2.（可选）配置 Redis 地址，不配置则默认 127.0.0.1:6379
 export REDIS_ADDR="127.0.0.1:6379"
+
+# 3. 启动后端（开发/测试时可以直接用 go run）
 go run main.go
 ```
 
-默认监听 `:8080`。
+默认监听 `:8080`，即本机 `http://127.0.0.1:8080`。
 
 ### 9.3 使用 Nginx 托管前端并反向代理后端
 
-将 `dist/` 上传到服务器（例如 `/var/www/whale-vault`），站点配置示例：
+将 `dist/` 上传到服务器（例如 `/var/www/whale-vault`），站点配置示例（以 `198.55.109.102` 为例）：
 
 ```nginx
 server {
     listen 80;
-    server_name your-domain-or-ip;
+    server_name 198.55.109.102;
+
     root /var/www/whale-vault;
     index index.html;
-    location / { try_files $uri $uri/ /index.html; }
-    location /relay/   { proxy_pass http://127.0.0.1:8080/relay/; }
-    location /metrics/ { proxy_pass http://127.0.0.1:8080/metrics/; }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 转发中继与统计接口到本机 8080 端口
+    location /relay/ {
+        proxy_pass http://127.0.0.1:8080/relay/;
+    }
+
+    location /metrics/ {
+        proxy_pass http://127.0.0.1:8080/metrics/;
+    }
+
+    # 转发 Secret Code 校验接口
+    location /secret/ {
+        proxy_pass http://127.0.0.1:8080/secret/;
+    }
 }
 ```
 
-将前端 `BACKEND_URL` 指向同域地址（例如 `http://your-domain-or-ip`），避免跨域。
+这样，前端配置 `BACKEND_URL = 'http://198.55.109.102'` 后，会访问：
+
+- `http://198.55.109.102/secret/verify`
+- `http://198.55.109.102/relay/mint`
+- `http://198.55.109.102/metrics/mint`
+
+Nginx 会将这些请求转发到同一台机器上的 Go 后端（端口 8080），整个部署结构清晰且避免跨域问题。
 
 ---
 

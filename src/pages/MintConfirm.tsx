@@ -280,7 +280,7 @@ export default function MintConfirm() {
         <p className="text-sm text-white/70 mb-4">Secret Code</p>
         <p className="text-base font-mono break-all">{code || '未识别到 Code'}</p>
         <div className="mt-6 space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="text-sm text-white/70">
               下载安装使用说明书：推荐安装{' '}
               <a href="https://talisman.xyz" target="_blank" rel="noreferrer" className="text-primary hover:text-primary/80 underline">
@@ -292,11 +292,35 @@ export default function MintConfirm() {
               </a>
               ，妥善保存助记词，并复制以 1 开头的地址。
             </div>
-            <div>
-              <div className="text-sm text-white/70 mb-1">已安装钱包？请输入您的接收地址</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-white/70">接收地址</div>
+                <button
+                  type="button"
+                  className="text-xs rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-primary hover:bg-primary/20 transition"
+                  onClick={() => {
+                    try {
+                      const addr = localStorage.getItem('selectedAddress') || ''
+                      if (!addr) {
+                        setState('error')
+                        setMessage('请先在右上角连接钱包')
+                        return
+                      }
+                      setRecipient(addr)
+                      setState('idle')
+                      setMessage('')
+                    } catch {
+                      setState('error')
+                      setMessage('无法读取当前钱包地址')
+                    }
+                  }}
+                >
+                  使用当前钱包地址
+                </button>
+              </div>
               <input
                 className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-primary/60 font-mono text-sm"
-                placeholder="请输入您的波卡钱包地址（以 1 开头）"
+                placeholder="请输入或确认接收地址（以 1 开头）"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
               />
