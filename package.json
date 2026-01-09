@@ -12,7 +12,6 @@
     "@polkadot/api": "^16.5.4",
     "@polkadot/api-contract": "^16.5.4",
     "@polkadot/extension-dapp": "^0.62.6",
-    "@yudiel/react-qr-scanner": "^2.5.0",
     "canvas-confetti": "^1.9.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

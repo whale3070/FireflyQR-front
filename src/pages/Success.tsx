@@ -167,10 +167,10 @@ export default function Success() {
         {state === 'denied' && <div className="text-sm text-red-400">验证未通过，请确认持有权限</div>}
         <div className="pt-2">
           <Link
-            to="/scan"
+            to="/"
             className="inline-flex items-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 px-4 py-2 text-sm text-white/80 transition"
           >
-            继续扫码下一本
+            返回首页
           </Link>
         </div>
       </div>
