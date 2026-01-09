@@ -23,6 +23,8 @@ export default function MintConfirm() {
   const [confirmLoading, setConfirmLoading] = useState<boolean>(false)
   const [normalizedRecipient, setNormalizedRecipient] = useState<string>('')
   const [addressConverted, setAddressConverted] = useState<boolean>(false)
+  const [codeVerified, setCodeVerified] = useState<boolean>(false)
+  const [codeVerifying, setCodeVerifying] = useState<boolean>(false)
 
   const base58LikeRegex = useMemo(() => /^[1-9A-HJ-NP-Za-km-z]+$/, [])
   const validateAddress = (value: string) => {
@@ -45,6 +47,15 @@ export default function MintConfirm() {
     const bytes = new Uint8Array(digest)
     return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
   }
+
+  const verifyCode = async (rawCode: string) => {
+    const codeHash = await sha256Hex(rawCode)
+    const url = `${BACKEND_URL}/secret/verify?codeHash=${encodeURIComponent(codeHash)}`
+    const resp = await fetch(url, { method: 'GET' })
+    if (!resp.ok) return false
+    const body = await resp.json().catch(() => ({} as any))
+    return body?.ok === true
+  }
   const buildSuccessPath = () => {
     const qs: string[] = []
     if (bookIdRaw) qs.push(`book_id=${encodeURIComponent(bookIdRaw)}`)
@@ -63,10 +74,37 @@ export default function MintConfirm() {
     } catch {}
   }, [recipient])
 
+  useEffect(() => {
+    ;(async () => {
+      if (!code) {
+        setCodeVerified(false)
+        return
+      }
+      try {
+        setCodeVerifying(true)
+        const ok = await verifyCode(code)
+        setCodeVerified(ok)
+        if (!ok) {
+          setMessage('兑换码无效，无法 Mint')
+        }
+      } catch {
+        setCodeVerified(false)
+        setMessage('兑换码验证失败')
+      } finally {
+        setCodeVerifying(false)
+      }
+    })()
+  }, [code])
+
   const handleMint = async () => {
     if (!code) {
       setState('error')
       setMessage('未获取到 Secret Code')
+      return
+    }
+    if (!codeVerified) {
+      setState('error')
+      setMessage('兑换码无效，无法 Mint')
       return
     }
     if (!config.contractAddress || !config.abiUrl) {
@@ -143,6 +181,11 @@ export default function MintConfirm() {
     if (!code) {
       setState('error')
       setMessage('未获取到 Secret Code')
+      return
+    }
+    if (!codeVerified) {
+      setState('error')
+      setMessage('兑换码无效，无法 Mint')
       return
     }
     {
@@ -263,14 +306,14 @@ export default function MintConfirm() {
             <button
               className="rounded-lg bg-accent/30 hover:bg-accent/50 border border-accent/50 px-4 py-2 transition shadow-glow"
               onClick={handleMint}
-              disabled={state === 'sending' || state === 'in-block'}
+              disabled={state === 'sending' || state === 'in-block' || codeVerifying || !codeVerified}
             >
               {state === 'sending' ? '发送中...' : state === 'in-block' ? '区块确认中...' : '确认 Mint'}
             </button>
             <button
               className="rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary px-4 py-2 transition shadow-glow"
               onClick={handleMintGasless}
-              disabled={state === 'sending'}
+              disabled={state === 'sending' || codeVerifying || !codeVerified}
             >
               免 Gas 铸造
             </button>

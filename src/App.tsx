@@ -6,6 +6,7 @@ import Scan from './pages/Scan'
 import MintConfirm from './pages/MintConfirm'
 import Settings from './pages/Settings'
 import Success from './pages/Success'
+import SecretCodeGate from './pages/SecretCodeGate'
 import AdminLayout from './admin/AdminLayout'
 import OverviewPage from './admin/OverviewPage'
 import SalesPage from './admin/SalesPage'
@@ -22,6 +23,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/scan" element={<Scan />} />
+            <Route path="/whale_valut/:code" element={<SecretCodeGate />} />
+            <Route path="/whale_vault/:code" element={<SecretCodeGate />} />
             <Route path="/mint-confirm" element={<MintConfirm />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/success" element={<Success />} />
