@@ -20,6 +20,9 @@ export default function Success() {
   const [address, setAddress] = useState<string>('')
   const [state, setState] = useState<VerifyState>('idle')
   const [message, setMessage] = useState<string>('')
+  const [matrixId, setMatrixId] = useState<string>('')
+  const [inviteStatus, setInviteStatus] = useState<string>('')
+  const [isInviting, setIsInviting] = useState(false)
 
   const bookId = useMemo(() => {
     const n = Number(bookIdRaw)
@@ -94,6 +97,35 @@ export default function Success() {
     }
   }
 
+  const handleJoinMatrix = async () => {
+    if (!matrixId.includes(':')) {
+      setInviteStatus('请输入完整的 Matrix ID (如 @user:matrix.org)')
+      return
+    }
+
+    setIsInviting(true)
+    setInviteStatus('正在请求邀请...')
+
+    try {
+      const response = await fetch('http://192.168.47.128:8080/api/matrix/test-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matrixId, address })
+      })
+
+      if (response.ok) {
+        setInviteStatus('✅ 邀请已发送！请检查 Element 通知')
+      } else {
+        const data = await response.json()
+        setInviteStatus(`❌ 失败: ${data.error || '服务器错误'}`)
+      }
+    } catch (err) {
+      setInviteStatus('❌ 无法连接到后端 Relay Server')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
   const arweaveUrl = useMemo(() => {
     if (arTxId) {
       return `${ARWEAVE_GATEWAY}${arTxId}`
@@ -131,49 +163,87 @@ export default function Success() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b border-white/5 pb-6">
           <button
             className="rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary px-4 py-2 transition shadow-glow"
             onClick={verifyAccess}
-            disabled={state === 'verifying'}
+            disabled={state === 'verifying' || state === 'granted'}
           >
-            {state === 'verifying' ? '验证中...' : '验证访问权限'}
+            {state === 'verifying' ? '验证中...' : state === 'granted' ? '验证通过' : '验证访问权限'}
           </button>
           {message && <span className="text-sm text-white/70">{message}</span>}
         </div>
 
         {state === 'granted' && (
-          <div className="space-y-3">
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
+              <h3 className="text-sm font-bold text-accent mb-3 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                解锁私域社群权益
+              </h3>
+
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={matrixId}
+                  onChange={(e) => setMatrixId(e.target.value)}
+                  placeholder="@username:matrix.org"
+                  className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-accent/50 transition"
+                />
+                <button
+                  onClick={handleJoinMatrix}
+                  disabled={isInviting}
+                  className="w-full bg-accent/30 hover:bg-accent/50 border border-accent/50 text-white font-medium py-2 rounded-lg transition shadow-glow disabled:opacity-50"
+                >
+                  {isInviting ? '处理中...' : '立即加入 Matrix 私域群'}
+                </button>
+                {inviteStatus && (
+                  <p className={`text-xs text-center ${inviteStatus.includes('✅') ? 'text-emerald-400' : 'text-accent/80'}`}>
+                    {inviteStatus}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {arweaveUrl && (
               <a
                 href={arweaveUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="block rounded-lg bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/40 text-emerald-300 px-4 py-2 transition shadow-glow"
+                className="block text-center rounded-lg bg-emerald-400/10 hover:bg-emerald-400/20 border border-emerald-400/30 text-emerald-300 px-4 py-2 transition"
               >
-                打开 Arweave 内容
+                📖 阅读 Arweave 链上正文
               </a>
             )}
-            <a
-              href={matrixUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="block rounded-lg bg-accent/30 hover:bg-accent/50 border border-accent/50 text-white px-4 py-2 transition shadow-glow"
-            >
-              进入 Matrix 私域社群
-            </a>
           </div>
         )}
+
         {state === 'denied' && <div className="text-sm text-red-400">验证未通过，请确认持有权限</div>}
-        <div className="pt-2">
+
+        <div className="pt-2 flex flex-wrap gap-3">
+          <Link
+            to="/scan"
+            className="inline-flex items-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 px-4 py-2 text-sm text-white/80 transition"
+          >
+            ← 继续扫码下一本
+          </Link>
           <Link
             to="/"
             className="inline-flex items-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 px-4 py-2 text-sm text-white/80 transition"
           >
             返回首页
           </Link>
+          <a
+            href={matrixUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-lg bg-accent/30 hover:bg-accent/50 border border-accent/50 text-white px-4 py-2 text-sm transition shadow-glow"
+          >
+            直接进入 Matrix 私域社群
+          </a>
         </div>
       </div>
     </div>
   )
 }
+ 
