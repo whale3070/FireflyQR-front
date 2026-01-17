@@ -2,7 +2,7 @@
 
 Whale Vault 是一个围绕 **实体书兑换码 Hash Code** 的 NFT 金库与收银台 DApp，面向读者、作者和出版社三方：
 
-- 读者：使用微信/系统相机扫码打开领取链接 → 填写波卡地址 → 领取 NFT → 解锁 Arweave 正文、Matrix 私域社群等数字权益
+- 读者：使用微信/系统相机扫码打开领取链接 → 填写Monad地址 → 领取 NFT → 解锁 Arweave 正文、Matrix 私域社群等数字权益
 - 作者 / 出版社：在管理后台查看销量、财务数据，一键提现和批量导入授权
 - 平台方：运行 Go 中间层提供 **免 Gas 领取入口（中继）**，并做风控与统计
 
@@ -18,7 +18,7 @@ Whale Vault 是一个围绕 **实体书兑换码 Hash Code** 的 NFT 金库与�
 
 ### 1.1 收银台（读者侧）
 
-完整用户流：**扫码打开领取链接 → 自动校验兑换码 → 填写波卡地址 → 确认领取 → 成功页 → 解锁内容**。
+完整用户流：**扫码打开领取链接 → 自动校验兑换码 → 填写Monad地址 → 确认领取 → 成功页 → 解锁内容**。
 
 - 领取页 `/valut_mint_nft/:hashCode`
   - 实体书二维码内容为 URL：`http://Domain/valut_mint_nft/:hashCode`
@@ -26,7 +26,7 @@ Whale Vault 是一个围绕 **实体书兑换码 Hash Code** 的 NFT 金库与�
     - `GET /secret/verify?codeHash={hashCode}`
   - 校验通过后显示：
     - 新手引导（钱包下载说明）
-    - 波卡地址输入框：「请输入您的波卡钱包地址」
+    - Monad地址输入框：「请输入您的Monad钱包地址」
     - 按钮：「确认领取」
   - 校验失败时显示全屏错误提示，不展示输入框
 
@@ -209,7 +209,7 @@ go run main.go
 - 功能：
   - 通过 Path Parameter 读取 `hashCode`
   - 页面加载时自动调用 `GET /secret/verify?codeHash={hashCode}` 校验兑换码
-  - 校验通过后展示波卡地址输入框与「确认领取」按钮
+  - 校验通过后展示Monad地址输入框与「确认领取」按钮
   - 点击「确认领取」后调用 `POST /relay/mint`，成功后跳转 `/success`
 
 ### 4.3 成功展示页 `/success`
@@ -403,7 +403,7 @@ go run main.go
    - 二维码内容为 URL：`http://Domain/valut_mint_nft/{hashCode}`
 2. 在领取页 `/valut_mint_nft/:hashCode` 中：
    - 页面自动调用 `GET /secret/verify?codeHash=...` 校验兑换码
-   - 校验通过后输入波卡地址，点击「确认领取」提交领取请求到 `/relay/mint`
+   - 校验通过后输入Monad地址，点击「确认领取」提交领取请求到 `/relay/mint`
 3. 成功后自动跳转 `/success`，在成功页点击「验证访问权限」，通过后：
    - 打开 Arweave 正文内容（优先使用 URL 参数 `ar`，否则使用 BOOKS 映射）。
    - 加入 Matrix 私域社群。
