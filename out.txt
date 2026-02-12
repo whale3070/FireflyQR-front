@@ -1,40 +1,147 @@
-src/admin/TopUpPage.tsx:68: * POST /api/admin/usdt/recharge
-src/admin/TopUpPage.tsx:336:      const url = `${base}/api/admin/usdt/recharge`.replace(/^\/api/, "/api").replace("//api", "/api");
-src/admin/TopUpPage.tsx:338:      const res = await fetch(url, {
-src/admin/TopUpPage.tsx:390:          注：当前已接入后端 Demo：<b>管理员代充 USDT（/api/admin/usdt/recharge）</b>；其他资产仍为前端演示占位。
-src/admin/PublisherAdminLayout.tsx:168:    const url = `${base}/api/v1/analytics/distribution`;
-src/admin/PublisherAdminLayout.tsx:169:    const res = await fetch(url, { method: "GET" });
-src/admin/PublisherAdminLayout.tsx:210:        const url = `${base}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(
-src/admin/PublisherAdminLayout.tsx:214:        const res = await fetch(url, { method: "GET" });
-src/admin/PublisherAdminLayout.tsx:424:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/deploy-book`;
-src/admin/PublisherAdminLayout.tsx:425:      const res = await fetch(url, {
-src/admin/PublisherAdminLayout.tsx:514:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/zip?count=${encodeURIComponent(
-src/admin/PublisherAdminLayout.tsx:518:      const res = await fetch(url, { method: "GET" });
-src/hooks/useApi.ts:43:      const res = await fetch(url, {
-src/hooks/useApi.ts:259:   * GET /api/v1/publisher/balance?publisher=0x...&codeHash=xxx
-src/hooks/useApi.ts:268:        `/api/v1/publisher/balance?publisher=${encodeURIComponent(publisher)}&address=${encodeURIComponent(
-src/hooks/useApi.ts:325:  // 如果你之后要做“无 privKey”的部署，请在 PublisherAdminLayout 里继续用你现在的 POST /api/v1/publisher/deploy-book（后端从 Redis 取私钥）。
-src/hooks/useApi.ts:330:   * 真实后端：GET /api/v1/analytics/distribution
-src/hooks/useApi.ts:334:      `/api/v1/analytics/distribution`,
-src/hooks/useApi.ts:344:   * 市场数据：GET /api/v1/market/tickers
-src/hooks/useApi.ts:349:        `/api/v1/market/tickers?page=${encodeURIComponent(String(page))}`,
-src/components/SalesBoard.tsx:19:      const res = await fetch(`${BACKEND_URL}/metrics/mint`)
-src/App.tsx:38:      const response = await fetch(
-src/pages/onetime_Reward.tsx:30:      const response = await fetch('/relay/reward', {
-src/pages/Heatmap.tsx:73:        const geoJsonRes = await fetch('/world.json');
-src/pages/Publisher.tsx:38:// ✅ 后端热力图接口实际是 /api/v1/analytics/distribution（兼容之前前端叫 heatmap 的概念）
-src/pages/Publisher.tsx:41:  const url = `${base}/api/v1/analytics/distribution`;
-src/pages/Publisher.tsx:42:  const res = await fetch(url, { method: "GET" });
-src/pages/Publisher.tsx:139:// REAL 模式：debounce 300ms 搜索出版社书籍（/api/v1/publisher/books/search）
-src/pages/Publisher.tsx:159:      const url = `${base}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(q)}&limit=20&offset=0`;
-src/pages/Publisher.tsx:161:      const res = await fetch(url, { method: "GET" });
-src/pages/Publisher.tsx:305:const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/deploy-book`;
-src/pages/Publisher.tsx:306:      const res = await fetch(url, {
-src/pages/Publisher.tsx:376:      // ⚠️ 这里假设后端路由为：GET {apiBaseUrl}/api/v1/publisher/zip?count=100&contract=0x...
-src/pages/Publisher.tsx:378:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/zip?count=${encodeURIComponent(String(n))}&contract=${encodeURIComponent(contractAddr)}`;
-src/pages/Publisher.tsx:380:      const res = await fetch(url, { method: "GET" });
-src/pages/AdminDashboard.tsx:27:          fetch(`http://localhost:8080/api/v1/stats/sales?address=${address}`),
-src/pages/AdminDashboard.tsx:28:          fetch(`http://localhost:8080/api/v1/analytics/distribution?address=${address}`)
-src/pages/input_hashcode_Reward.tsx:13:      const res = await fetch(`/relay/get-saved?address=${address}`);
-src/pages/input_hashcode_Reward.tsx:34:      const response = await fetch('/relay/save-code', {
-src/pages/input_hashcode_Reward.tsx:59:      const response = await fetch('/relay/reward', {
+src/admin/PublisherAdminLayout.tsx:4:// - Force envMode = "real" (cannot enter mock)
+src/admin/PublisherAdminLayout.tsx:32:  envMode: "real" | "mock";
+src/admin/PublisherAdminLayout.tsx:33:  toggleEnvMode: () => void;
+src/admin/PublisherAdminLayout.tsx:235:  const envMode: "real" | "mock" = "real";
+src/admin/PublisherAdminLayout.tsx:236:  const toggleEnvMode = () => {};
+src/admin/PublisherAdminLayout.tsx:244:  const storageKey = envMode === "mock" ? "publisher_mock_books" : "publisher_real_books";
+src/admin/PublisherAdminLayout.tsx:284:    if (envMode !== "real") return;
+src/admin/PublisherAdminLayout.tsx:319:    if (envMode !== "real") return;
+src/admin/PublisherAdminLayout.tsx:351:  }, [bookQuery, envMode, pubAddress]);
+src/admin/PublisherAdminLayout.tsx:386:      if (envMode === "real") {
+src/admin/PublisherAdminLayout.tsx:413:      // unreachable (envMode forced real), but kept for reference
+src/admin/PublisherAdminLayout.tsx:434:      if (envMode === "real") {
+src/admin/PublisherAdminLayout.tsx:438:        showToast(e?.message || "REAL 仪表盘拉取失败：已显示空数据", "error");
+src/admin/PublisherAdminLayout.tsx:493:      if (envMode === "mock") {
+src/admin/PublisherAdminLayout.tsx:507:  // ✅ REAL 部署：不再用 MetaMask，直接让后端(用Redis私钥)扣费+部署
+src/admin/PublisherAdminLayout.tsx:518:      if (envMode === "mock") {
+src/admin/PublisherAdminLayout.tsx:624:      if (envMode === "mock") {
+src/admin/PublisherAdminLayout.tsx:673:    envMode,
+src/admin/PublisherAdminLayout.tsx:674:    toggleEnvMode,
+src/admin/PublisherAdminLayout.tsx:730:          <p className="text-slate-500 text-sm">{envMode === "mock" ? "加载 Mock 数据..." : "连接后端 API..."}</p>
+src/admin/PublisherAdminLayout.tsx:748:              {/* ✅ Hackathon: 隐藏 Mock/Real 切换按钮（仍强制 REAL） */}
+src/admin/PublisherAdminLayout.tsx:761:              {envMode === "real" ? (
+src/admin/OverviewPage.tsx:17:    envMode,
+src/admin/OverviewPage.tsx:28:    if (envMode !== "real") return;
+src/admin/OverviewPage.tsx:69:  }, [envMode]);
+src/admin/OverviewPage.tsx:74:  }, [envMode]);
+src/admin/OverviewPage.tsx:79:      uniqueRealUsers: 0,
+src/admin/OverviewPage.tsx:84:    if (envMode !== "real") return agg;
+src/admin/OverviewPage.tsx:91:      agg.uniqueRealUsers += Number(s.unique_real_users || 0);
+src/admin/OverviewPage.tsx:96:  }, [bookSales, envMode, nftStatsMap]);
+src/admin/OverviewPage.tsx:102:    if (envMode === "real") return liveLeaderboard;
+src/admin/OverviewPage.tsx:108:  }, [envMode, liveLeaderboard, regionRanks]);
+src/admin/OverviewPage.tsx:128:            {envMode === "real" ? totals.mintedTotal.toLocaleString() : "—"}
+src/admin/OverviewPage.tsx:131:            {envMode === "real"
+src/admin/OverviewPage.tsx:138:          <p className="text-purple-600 text-xs uppercase font-semibold mb-1">Unique Real Readers</p>
+src/admin/OverviewPage.tsx:140:            {envMode === "real" ? totals.uniqueRealUsers.toLocaleString() : "—"}
+src/admin/OverviewPage.tsx:151:            {envMode === "real" && (
+src/admin/OverviewPage.tsx:161:                envMode === "mock" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+src/admin/OverviewPage.tsx:164:              {envMode === "mock" ? "Demo Data" : "Live Data"}
+src/admin/OverviewPage.tsx:170:          {envMode === "real" && lbLoading && (
+src/admin/OverviewPage.tsx:173:          {envMode === "real" && lbErr && (
+src/admin/OverviewPage.tsx:229:            {envMode === "real" && (
+src/admin/OverviewPage.tsx:239:                envMode === "mock" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+src/admin/OverviewPage.tsx:242:              {envMode === "mock" ? "Demo Data" : "Live Data"}
+src/admin/OverviewPage.tsx:284:                  {envMode === "real" ? (nftStatsMap?.[(book.address || "").toLowerCase()]?.minted_total ?? "—") : "—"}
+src/admin/OverviewPage.tsx:287:                  {envMode === "real" ? (nftStatsMap?.[(book.address || "").toLowerCase()]?.unique_real_users ?? "—") : "—"}
+src/admin/AddBookPage.tsx:7:    envMode, apiBaseUrl, error, opLoading,
+src/admin/AddBookPage.tsx:24:            envMode === "mock"
+src/admin/AddBookPage.tsx:29:          <p className={`text-xs ${envMode === "mock" ? "text-amber-700" : "text-emerald-700"}`}>
+src/admin/AddBookPage.tsx:30:            {envMode === "mock"
+src/admin/AddBookPage.tsx:82:            说明：为了防止链上产生大量垃圾书籍合约，REAL 模式下部署前会要求支付 <b>10 USDT</b>。
+src/admin/QrCodePage.tsx:7:    envMode,
+src/admin/QrCodePage.tsx:39:            {envMode === "mock" ? (
+src/hooks/useApi.ts:29:  const { isMockMode, apiBaseUrl } = useAppMode();
+src/hooks/useApi.ts:32:   * 统一 fetch：自动 Mock/Real，且对非 JSON（HTML/网关错误页）更友好
+src/hooks/useApi.ts:40:      // Mock: 只有明确允许的接口才走 mockFn
+src/hooks/useApi.ts:41:      if (isMockMode) {
+src/hooks/useApi.ts:43:        throw new Error("Mock 模式下该接口已禁用");
+src/hooks/useApi.ts:78:    [isMockMode, apiBaseUrl]
+src/hooks/useApi.ts:87:   * ⚠️ 已按你的要求：删掉 mint mock（Mock 模式会直接报错）
+src/hooks/useApi.ts:106:   * ⚠️ 已按你的要求：删掉 tx mock（Mock 模式会直接报错）
+src/hooks/useApi.ts:288:      if (isMockMode) {
+src/hooks/useApi.ts:305:    [isMockMode]
+src/hooks/useApi.ts:347:    isMockMode,
+src/hooks/useMockSimulation.ts:9:  MockBook 
+src/hooks/useMockSimulation.ts:17:    book: MockBook | null;
+src/components/Leaderboard.tsx:11:  const { isMockMode } = useAppMode();
+src/components/Leaderboard.tsx:45:    // 非 Mock 模式下每 30 秒自动刷新
+src/components/Leaderboard.tsx:46:    if (!isMockMode) {
+src/components/Leaderboard.tsx:50:  }, [isMockMode]);
+src/components/Leaderboard.tsx:58:        <span className={`text-[10px] ${isMockMode ? 'text-cyan-400' : 'text-green-400'}`}>
+src/components/Leaderboard.tsx:59:          {isMockMode ? 'Mock' : 'Live'}
+src/components/BettingModal.tsx:2:import { useBettingSimulation } from '../hooks/useMockSimulation';
+src/components/BettingModal.tsx:5:import { MockBook } from '../data/mockData';
+src/components/BettingModal.tsx:7:interface BettingModalProps { isOpen: boolean; onClose: () => void; book: MockBook; onBetPlaced?: (amount: number, newPool: number) => void; }
+src/components/ModeSwitcher.tsx:6:  const { mode, toggleMode, isMockMode } = useAppMode();
+src/components/ModeSwitcher.tsx:16:        ${isMockMode 
+src/components/ModeSwitcher.tsx:21:      title={isMockMode ? '切换到开发者模式 (真实API)' : '切换到 Mock 模式'}
+src/components/ModeSwitcher.tsx:23:      {isMockMode ? (
+src/components/ModeSwitcher.tsx:26:          <span>Mock</span>
+src/components/ScanVerifyModal.tsx:2:import { useScanSimulation } from '../hooks/useMockSimulation';
+src/contexts/AppModeContext.tsx:7:  isMockMode: boolean;
+src/contexts/AppModeContext.tsx:34:    isMockMode: mode === 'mock',
+src/data/mockData.ts:3:// Mock Data Layer (No Backend Required)
+src/data/mockData.ts:6:export interface MockBook {
+src/data/mockData.ts:21:export interface MockRegion {
+src/data/mockData.ts:26:// ========== 核心 Mock 书籍数据 ==========
+src/data/mockData.ts:27:export const MOCK_BOOKS: MockBook[] = [
+src/data/mockData.ts:142:// ========== Mock 地理分布数据 ==========
+src/data/mockData.ts:143:export const MOCK_REGIONS: MockRegion[] = [
+src/data/mockData.ts:161:// ========== Mock 排行榜数据 ==========
+src/data/mockData.ts:191:export const getRandomBook = (): MockBook => {
+src/data/mockData.ts:196:export const getBookById = (id: string): MockBook | undefined => {
+src/data/mockData.ts:208:  book: MockBook;
+src/pages/VerifyPage.tsx:16:  const { isMockMode } = useAppMode();
+src/pages/VerifyPage.tsx:142:          {isMockMode && (
+src/pages/VerifyPage.tsx:149:          Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? 'DEMO MODE' : 'DEV API'}
+src/pages/VerifyPage.tsx:159:        <p className={`text-sm ${isMockMode ? 'text-amber-600' : 'text-emerald-600'}`}>
+src/pages/VerifyPage.tsx:160:          {isMockMode ? 'Mock 验证中...' : '连接后端 API...'}
+src/pages/VerifyPage.tsx:203:          className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-xl p-3 text-center`}
+src/pages/VerifyPage.tsx:206:            className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}
+src/pages/VerifyPage.tsx:208:            {isMockMode ? '🔧 Demo Mode - Mock Data' : '🟢 Dev API - 后端验证'}
+src/pages/VerifyPage.tsx:331:        Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? 'DEMO MODE' : 'DEV API'}
+src/pages/Heatmap.tsx:1:// Heatmap.tsx (REAL ONLY)
+src/pages/Heatmap.tsx:3:// - 不再使用 MOCK_REGIONS / 不再读取 envMode / publisher_env_mode / isMockMode
+src/pages/Reward.tsx:9:  const { isMockMode } = useAppMode();
+src/pages/Reward.tsx:36:    if (!isMockMode) {
+src/pages/Reward.tsx:40:  }, [getLeaderboard, isMockMode]);
+src/pages/Reward.tsx:48:        <span className={`text-xs ${isMockMode ? 'text-amber-600' : 'text-emerald-600'}`}>
+src/pages/Reward.tsx:49:          {isMockMode ? 'Mock' : 'Live'}
+src/pages/Reward.tsx:83:  const { isMockMode, apiBaseUrl } = useAppMode();
+src/pages/Reward.tsx:191:        <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center mb-6`}>
+src/pages/Reward.tsx:192:          <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+src/pages/Reward.tsx:193:            {isMockMode ? '🔧 Demo Mode - Mock Data' : `🟢 Dev API - ${apiBaseUrl}`}
+src/pages/Reward.tsx:263:        Whale Vault Protocol • {isMockMode ? 'DEMO MODE' : 'DEV API'}
+src/pages/Success.tsx:47:  const { isMockMode } = useAppMode();
+src/pages/Success.tsx:123:          if (isMockMode) {
+src/pages/Success.tsx:147:  }, [txHash, queryTransaction, userAddress, isMockMode]);
+src/pages/Success.tsx:215:              isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
+src/pages/Success.tsx:220:                isMockMode ? 'text-amber-700' : 'text-emerald-700'
+src/pages/Success.tsx:223:              {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
+src/pages/Success.tsx:338:            isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
+src/pages/Success.tsx:343:              isMockMode ? 'text-amber-700' : 'text-emerald-700'
+src/pages/Success.tsx:346:            {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
+src/pages/BookDetail.tsx:39:  const { isMockMode } = useAppMode(); // ✅ 方案 B：跟全局模式联动
+src/pages/BookDetail.tsx:52:  // ✅ 这里把全局 isMockMode 映射为 Heatmap 的 envMode（mock/real）
+src/pages/BookDetail.tsx:53:  const envMode = isMockMode ? "mock" : "real";
+src/pages/BookDetail.tsx:116:              REAL-TIME DISTRIBUTION (GEOGRAPHIC ECHO)
+src/pages/BookDetail.tsx:129:              <Heatmap envMode={envMode} />
+src/pages/MintConfirm.tsx:15:  const { isMockMode } = useAppMode();
+src/pages/MintConfirm.tsx:67:      if (isMockMode) {
+src/pages/MintConfirm.tsx:139:  }, [codeHash, hasStarted, isMockMode, mintNFT, getBinding, pollTransactionStatus, navigate, bookIdRaw]);
+src/pages/MintConfirm.tsx:147:          desc: "你已删除模拟 mint 流程。请切换到 REAL/DEV API 模式后再扫码铸造。",
+src/pages/MintConfirm.tsx:177:            <p className="mt-1 text-xs font-mono text-slate-700">{isMockMode ? "DEMO" : "DEV API / REAL"}</p>
+src/pages/MintConfirm.tsx:197:          Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? "DEMO MODE" : "DEV API"}
+src/pages/Bookshelf.tsx:7:import { MOCK_BOOKS, MockBook } from '../data/mockData';
+src/pages/Bookshelf.tsx:24:  const { isMockMode } = useAppMode();
+src/pages/Bookshelf.tsx:27:  const [tickers, setTickers] = useState<MockBook[]>([]);
+src/pages/Bookshelf.tsx:35:  const [selectedBook, setSelectedBook] = useState<MockBook | null>(null);
+src/pages/Bookshelf.tsx:102:  const handleBookClick = (book: MockBook) => {
+src/pages/Bookshelf.tsx:107:  const handleBetClick = (e: React.MouseEvent, book: MockBook) => {
+src/pages/Bookshelf.tsx:129:            {isMockMode ? '加载 Mock 数据...' : '连接后端 API...'}
+src/pages/Bookshelf.tsx:149:            <span className={`text-sm font-medium ${isMockMode ? 'text-amber-600' : 'text-emerald-600'}`}>
+src/pages/Bookshelf.tsx:150:              {isMockMode ? 'MOCK MODE' : 'DEV API'}
+src/pages/Bookshelf.tsx:197:          <p className="text-slate-500">{t('subtitle') || 'Real-time Book Sales & Prediction Market'}</p>
+src/pages/Bookshelf.tsx:199:            isMockMode 
+src/pages/Bookshelf.tsx:203:            {isMockMode ? '🔧 DEMO MODE - No Backend Required' : '🟢 DEV API - Connected to Backend'}

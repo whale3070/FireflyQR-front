@@ -99,3 +99,5 @@ echo "   - 线上目录：$WEB_ROOT"
 echo "   - 备份目录：${BACKUP_DIR:-无}"
 echo "🎉 部署闭环完成。"
 cp /root/faucethub/server/conflux-faucet-plugin.js /var/www/static/
+cp /root/git-connect-helper-edbe1c7c/public/whale-vault-pitch-deck.mp4 /var/www/whale-vault/assets
+cp /root/git-connect-helper-edbe1c7c/public/pitch-deck.html /var/www/whale-vault/

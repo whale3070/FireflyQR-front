@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Whale Vault — Verifiable Sales Tracking on Conflux</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Whale Vault: Real-world action → On-chain proof → Automated settlement. A verifiable sales tracking system built on Conflux eSpace." />
+  <meta name="theme-color" content="#0f172a" />
+
+  <!-- Open Graph (for sharing) -->
+  <meta property="og:title" content="Whale Vault — Verifiable Sales Tracking on Conflux" />
+  <meta property="og:description" content="Real-world action → On-chain proof → Automated settlement." />
+  <meta property="og:type" content="website" />
+
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#020617;
+      --line:#1e293b;
+      --text:#e5e7eb;
+      --muted:#cbd5f5;
+      --muted2:#94a3b8;
+      --link:#60a5fa;
+      --chip:#1e293b;
+      --chipText:#93c5fd;
+      --ok:#34d399;
+      --bad:#fca5a5;
+      --shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.7;
+    }
+    a{ color:var(--link); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+    section{
+      min-height:100vh;
+      padding:72px 10%;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      border-bottom:1px solid var(--line);
+    }
+    @media (max-width: 900px){ section{ padding:56px 6%; } }
+
+    h1{
+      font-size:48px;
+      margin:0 0 12px 0;
+      color:#fff;
+      letter-spacing:-0.6px;
+    }
+    h2{
+      font-size:32px;
+      margin:0 0 12px 0;
+      color:#fff;
+      letter-spacing:-0.4px;
+    }
+
+    /* bilingual text blocks */
+    .b{ max-width: 1040px; margin: 10px 0; }
+    .en{
+      font-size:18px;
+      color:var(--muted);
+      margin:0;
+    }
+    .zh{
+      font-size:16px;
+      color:var(--muted2);
+      margin:6px 0 0 0;
+      letter-spacing:0.2px;
+    }
+    .em{ color:#fff; font-weight:800; }
+    code{
+      background:rgba(148,163,184,0.10);
+      padding:2px 8px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      color:#dbeafe;
+      font-size:0.98em;
+      white-space:nowrap;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:9px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(148,163,184,0.07);
+      color:var(--muted);
+      font-size:14px;
+      width: fit-content;
+      margin: 10px 0 0 0;
+    }
+    .dot{
+      width:9px; height:9px; border-radius:999px;
+      background:var(--ok);
+      box-shadow:0 0 0 4px rgba(52,211,153,0.12);
+    }
+
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:18px 18px;
+      margin-top:18px;
+      max-width:1040px;
+      box-shadow: var(--shadow);
+    }
+    .card .title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 10px;
+    }
+    .card .title b{
+      font-size:16px;
+      color:#fff;
+    }
+
+    .badlist{
+      list-style:none;
+      padding-left:0;
+      margin: 10px 0 0 0;
+      max-width: 1040px;
+    }
+    .badlist li{
+      margin:10px 0;
+      color:var(--muted);
+      font-size:18px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .bad{
+      color:var(--bad);
+      font-weight:900;
+      line-height:1.6;
+      margin-top:1px;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-top:14px;
+      max-width:1040px;
+    }
+    .tag{
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:999px;
+      background:var(--chip);
+      font-size:14px;
+      color:var(--chipText);
+      border:1px solid var(--line);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+      margin-top:14px;
+      max-width:1040px;
+    }
+    @media (max-width: 900px){ .grid{ grid-template-columns:1fr; } }
+
+    .metric{
+      background:rgba(148,163,184,0.06);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+    }
+    .metric .k{
+      color:#fff;
+      font-weight:800;
+      font-size:16px;
+      margin-bottom:6px;
+    }
+    .metric .v{
+      color:var(--muted2);
+      font-size:14px;
+      margin:0;
+    }
+
+    .ctaRow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    .cta{
+      display:inline-block;
+      padding:10px 14px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(96,165,250,0.14);
+      color:#dbeafe;
+      font-weight:700;
+    }
+    .cta:hover{ background:rgba(96,165,250,0.22); text-decoration:none; }
+
+    video{
+      width:100%;
+      border-radius:14px;
+      border:1px solid var(--line);
+      margin-top:12px;
+      background:#000;
+    }
+
+    .footer{
+      margin-top:34px;
+      font-size:14px;
+      color:var(--muted2);
+      max-width:1040px;
+    }
+
+    /* tiny helper to keep bilingual blocks visually grouped */
+    .sep{ height: 6px; }
+  </style>
+</head>
+<body>
+
+<!-- PAGE 1 -->
+<section>
+  <h1>Whale Vault</h1>
+
+  <div class="b">
+    <p class="en"><span class="em">Verifiable Sales Tracking</span> for cross-border distribution — we record <span class="em">real-world actions</span> as they happen, not self‑reported numbers.</p>
+    <p class="zh">面向跨境分销的<span class="em">可验证销量追踪</span>系统——把<span class="em">真实发生的扫码/兑换行为</span>实时记录下来，而不是依赖渠道自报数据。</p>
+  </div>
+
+  <div class="pill"><span class="dot"></span> LIVE on Conflux eSpace · 可现场演示（运行中）</div>
+
+  <div class="card">
+    <div class="title"><b>Problem / 问题</b></div>
+
+    <div class="b">
+      <p class="en">
+        In cross-border distribution, sales and usage data is often opaque, delayed, or manipulated.
+        Brands and publishers cannot reliably verify <span class="em">where</span>, <span class="em">when</span>, and <span class="em">how</span> products were actually sold or redeemed.
+      </p>
+      <p class="zh">
+        在跨境分销中，销量与使用数据往往<span class="em">不透明</span>、<span class="em">延迟</span>或<span class="em">可被篡改</span>。
+        品牌与出版社无法可靠验证产品<span class="em">在哪里</span>、<span class="em">什么时候</span>、以及<span class="em">如何</span>被实际售出或兑换。
+      </p>
+    </div>
+
+    <ul class="badlist">
+      <li><span class="bad">❌</span><span>Channel reports are not trustworthy (no audit trail) / 渠道报告不可验证（缺少审计追踪）</span></li>
+      <li><span class="bad">❌</span><span>Reconciliation is slow and manual across platforms/countries / 跨平台、跨国家对账慢且依赖人工</span></li>
+      <li><span class="bad">❌</span><span>Payments and sales data are disconnected / 支付与销售数据割裂，难以形成闭环</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Solution (one-line) / 解决方案（一句话）</b></div>
+
+    <div class="b">
+      <p class="en"><code>Real‑world Action → On‑chain Proof → Automated Settlement</code></p>
+      <p class="zh"><code>真实行为 → 链上凭证 → 自动结算</code></p>
+    </div>
+
+    <div class="b">
+      <p class="en">
+        Each scan/redeem produces a verifiable on-chain event on Conflux, making sales data queryable and enabling stablecoin settlement.
+      </p>
+      <p class="zh">
+        每一次扫码/兑换都会在 Conflux 上生成可验证的链上事件，让销量数据可查询、可审计，并支持稳定币结算与对账自动化。
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Live Demo / 在线演示</b></div>
+
+    <div class="b">
+      <p class="en">Scan‑to‑sale demo: trigger a real event and see it recorded on-chain.</p>
+      <p class="zh">扫码触发真实事件，并在链上看到记录（可现场演示）。</p>
+    </div>
+
+    <div class="ctaRow">
+      <a class="cta" href="http://whale3070.com/vault_mint_nft/ec8eb74142c97311f07470ef0b6db424dec06de0858b953917e823406e28d6b1" target="_blank" rel="noopener noreferrer">
+        Open Live Demo / 打开演示
+      </a>
+</div>
+  </div>
+
+  <div class="footer">
+    GWDC submission: Track B (Lowering Blockchain Barriers) · Track C (Cross‑Border PayFi) / 双赛道提交：B 降低门槛 · C 跨境 PayFi
+  </div>
+</section>
+
+<!-- PAGE 2 -->
+<section>
+  <h2>How It Works / 工作原理</h2>
+
+  <div class="b">
+    <p class="en">
+      Each product (physical or digital) is bound to an on‑chain contract. When a customer scans a QR code or redeems a code, a <span class="em">real sales event</span> is generated.
+    </p>
+    <p class="zh">
+      每个实体或数字商品都会绑定到链上合约；当用户扫码/兑换时，会生成一次<span class="em">真实销售事件</span>。
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Pipeline / 流程</b></div>
+    <ul class="badlist" style="margin-top:0">
+      <li><span class="bad">1</span><span>📦 Real‑world scan/redeem / 现实世界扫码或兑换</span></li>
+      <li><span class="bad">2</span><span>🔗 Event recorded on Conflux eSpace (timestamped, verifiable) / Conflux eSpace 记录事件（可验证、带时间戳）</span></li>
+      <li><span class="bad">3</span><span>💰 Stablecoin settlement (USDT) / 稳定币结算（USDT）</span></li>
+      <li><span class="bad">4</span><span>📊 Queryable data for reconciliation & analytics / 可查询数据用于对账与分析</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Web2-friendly UX / Web2 友好体验</b></div>
+    <div class="b">
+      <p class="en">
+        Users do <span class="em">not</span> need wallets or native tokens. Gas is abstracted via relayers, and can be upgraded with <span class="em">EIP‑7702</span> account abstraction.
+      </p>
+      <p class="zh">
+        用户<span class="em">无需</span>安装钱包或持有原生币；通过 relayer 进行 gas 代付，并可升级到 <span class="em">EIP‑7702</span> 账户抽象方案。
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>3‑Minute Demo Video / 3 分钟演示视频</b></div>
+    <div class="b">
+      <p class="en">
+        Watch: <span class="em">scan → mint → dashboard update</span>. Focus on the on‑chain transaction and the dashboard change.
+      </p>
+      <p class="zh">
+        看点：<span class="em">扫码 → 铸造 → 看板实时更新</span>。重点看链上交易与看板变化是否同步发生。
+      </p>
+    </div>
+    <video controls preload="metadata" poster="/assets/video-cover.png">
+      <source src="/assets/whale-vault-pitch-deck.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+
+  <div class="row">
+    <span class="tag">Conflux eSpace</span>
+    <span class="tag">Stablecoin Settlement</span>
+    <span class="tag">Gas Abstraction</span>
+    <span class="tag">EIP‑7702 Ready</span>
+    <span class="tag">On‑chain Reconciliation</span>
+  </div>
+
+  <div class="footer">
+    Tip / 提示：如果封面图不存在也不影响播放；建议放一张 <code>/assets/video-cover.png</code> 作为路演封面。
+  </div>
+</section>
+
+<!-- PAGE 3 -->
+<section>
+  <h2>Why This Matters / 为什么重要</h2>
+
+  <div class="b">
+    <p class="en">
+      Whale Vault targets Belt &amp; Road cross‑border distribution: publishing, branded goods, and physical merchandise exported from China to Southeast Asia, the Middle East, and beyond.
+    </p>
+    <p class="zh">
+      Whale Vault 面向“一带一路”相关的跨境分销场景：出版、品牌商品与实体货品，从中国出口到东南亚、中东等地区。
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>What you get / 你得到什么</b></div>
+    <ul class="badlist" style="margin-top:0">
+      <li><span class="bad">✔</span><span>🌍 Verifiable regional distribution / 可验证的区域销量分布</span></li>
+      <li><span class="bad">✔</span><span>⚡ Faster reconciliation and settlement / 更快的对账与结算</span></li>
+      <li><span class="bad">✔</span><span>🔍 No reliance on self‑reported channel data / 不依赖渠道自报数据</span></li>
+      <li><span class="bad">✔</span><span>🧩 Composable with DeFi/analytics / 可组合到 DeFi 与数据分析体系</span></li>
+    </ul>
+  </div>
+
+  <div class="grid">
+    <div class="metric">
+      <div class="k">Proof of Execution / 执行证明</div>
+      <p class="v">Live demo + on‑chain events. Not a slide‑only concept. / 有在线演示与链上事件，不是 PPT 项目。</p>
+    </div>
+    <div class="metric">
+      <div class="k">Business Model / 商业模式</div>
+      <p class="v">Per‑action fee · Settlement/reconciliation fee · Enterprise integration. / 单次事件费 · 结算/对账费 · 企业集成。</p>
+    </div>
+    <div class="metric">
+      <div class="k">Why Conflux / 为什么 Conflux</div>
+      <p class="v">Low fees + EVM compatibility makes high‑frequency event recording practical. / 低成本 + EVM 兼容，适合高频记录。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Open Source / 开源仓库</b></div>
+    <div class="b">
+      <p class="en">Full implementation (contracts, backend, demo frontend):</p>
+      <p class="zh">完整实现（合约、后端、前端演示）：</p>
+    </div>
+    <p style="margin:0">
+      👉 <a href="https://github.com/whale3070/GWDC-Hackathon-Whale-Vault" target="_blank" rel="noopener noreferrer">
+        github.com/whale3070/GWDC-Hackathon-Whale-Vault
+      </a>
+    </p>
+  </div>
+
+  <div class="b" style="margin-top:18px">
+    <p class="en"><span class="em">Real sales. Real data. Real settlement.</span></p>
+    <p class="zh"><span class="em">真实销量 · 真实数据 · 真实结算</span></p>
+  </div>
+
+  <div class="footer">
+    Built on Conflux · Dual Track Submission (B + C) / 基于 Conflux · 双赛道提交（B + C）
+  </div>
+</section>
+
+</body>
+</html>

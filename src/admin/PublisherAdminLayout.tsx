@@ -1,3 +1,9 @@
+// PublisherAdminLayout.tsx
+// ✅ Hackathon-safe build:
+// - Hide download-mode toggle button
+// - Force envMode = "real" (cannot enter mock)
+// - Keep existing OutletContext API for compatibility
+
 import React, { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
@@ -174,6 +180,13 @@ function mergeRegionCounts(items: RegionRank[]): RegionRank[] {
   return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
 }
 
+function readPublisherAuthFromStorage(): { addr: string; role: string } {
+  if (typeof window === "undefined") return { addr: "", role: "" };
+  const addr = (localStorage.getItem("vault_pub_auth") || "").trim();
+  const role = (localStorage.getItem("vault_user_role") || "").trim();
+  return { addr, role };
+}
+
 export default function PublisherAdminLayout() {
   const navigate = useNavigate();
   const { apiBaseUrl } = useAppMode(); // keep as-is for UI/context; do NOT rely on it for URL building
@@ -225,26 +238,15 @@ export default function PublisherAdminLayout() {
   const [bookSearchLoading, setBookSearchLoading] = useState<boolean>(false);
   const [selectedBook, setSelectedBook] = useState<any | null>(null);
 
-  // envMode (publisher panel internal)
-  const [envMode, setEnvMode] = useState<"real" | "mock">(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("publisher_env_mode") as "real" | "mock" | null)
-        : null;
-    return saved === "mock" ? "mock" : "real";
-  });
+  // ✅ Hackathon: 强制 real（不能进入 mock）
+  const envMode: "real" | "mock" = "real";
+  const toggleEnvMode = () => {};
 
-  const toggleEnvMode = () => {
-    setEnvMode((prev) => {
-      const next = prev === "real" ? "mock" : "real";
-      if (prev === "mock" && next === "real") {
-        const ok = window.confirm("即将切换到 REAL 模式，将调用真实后端与链上交易。继续？");
-        if (!ok) return prev;
-      }
-      localStorage.setItem("publisher_env_mode", next);
-      return next;
-    });
-  };
+  // ✅ 防止历史 localStorage 残留导致未来误入
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("publisher_env_mode", "real");
+  }, []);
 
   const storageKey = envMode === "mock" ? "publisher_mock_books" : "publisher_real_books";
   const loadBooksFromStorage = (): BookSales[] => {
@@ -306,18 +308,139 @@ export default function PublisherAdminLayout() {
     });
   };
 
-  // 切换 env 时读取各自 storage
+  // ✅ 拉 USDT 余额（链上 RPC；只是显示用）
+  const fetchUsdtBalanceInternal = async (ownerAddr: string, tokenAddr?: string) => {
+    const owner = (ownerAddr || "").trim();
+    const rpcUrl = RPC_URL;
+    const usdtAddr = (tokenAddr || USDT_ADDRESS || "").trim();
+
+    if (!isHexAddress(owner) || !isHexAddress(usdtAddr)) {
+      setBalanceUSDT(0);
+      return;
+    }
+
+    const r = await getErc20Balance(rpcUrl, usdtAddr, owner);
+    if (r?.ok) {
+      const n = Number(r.balance);
+      setBalanceUSDT(Number.isFinite(n) ? n : 0);
+    }
+  };
+
+  // ✅ 统一拉余额（CFX + USDT）
+  const fetchPublisherBalanceDataInternal = async (preferAddress?: string, token?: { address?: string }) => {
+    const publisher = (preferAddress || pubAddress || "").trim();
+    if (!isHexAddress(publisher)) return;
+
+    setBalanceLoading(true);
+    setUsdtLoading(true);
+
+    try {
+      const codeHash = localStorage.getItem("vault_code_hash") || "";
+      const result = await getPublisherBalance(publisher, codeHash);
+      if (result.ok) {
+        setBalanceCFX(parseFloat(result.balance));
+        setMaxDeploys(result.maxDeploys);
+      }
+      await fetchUsdtBalanceInternal(publisher, token?.address);
+    } finally {
+      setBalanceLoading(false);
+      setUsdtLoading(false);
+    }
+  };
+
+  const fetchPublisherBalanceData = async () => {
+    try {
+      await fetchPublisherBalanceDataInternal();
+      showToast("余额已刷新", "success");
+    } catch (e: any) {
+      showToast(e?.message || "获取余额失败", "error");
+    }
+  };
+
+  const refreshAfterTopup = async (token?: { symbol?: string; address?: string }) => {
+    await new Promise((r) => setTimeout(r, 600));
+    await fetchPublisherBalanceDataInternal(undefined, token);
+    showToast(`余额已自动刷新${token?.symbol ? `（${token.symbol}）` : ""}`, "success");
+  };
+
+  // 进入/刷新时：读取 storage
   useEffect(() => {
     if (typeof window === "undefined") return;
     setBookSales(loadBooksFromStorage());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [envMode]);
+  }, []);
 
-  // 切换环境后：刷新仪表盘
+  // ✅ 修复：默认 DEV 时 pubAddress 可能还没写入 localStorage
+  // - 监听 vault-auth-updated 事件（建议 Verify 成功后 dispatch）
+  // - 同时做短暂轮询（最多 ~3s），避免用户必须手动切换模式触发刷新
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let stopped = false;
+
+    const applyFromStorage = async (why: string) => {
+      if (stopped) return;
+      const { addr, role } = readPublisherAuthFromStorage();
+      const okRole = role === "publisher" || role === "author";
+      const okAddr = isHexAddress(addr);
+
+      if (okAddr && okRole) {
+        setPubAddress(addr);
+
+        // 首次拿到地址就拉一次余额（CFX + USDT）
+        try {
+          await fetchPublisherBalanceDataInternal(addr);
+        } catch {
+          // ignore
+        }
+      } else {
+        // 不要在 REAL 模式里生成随机地址覆盖（会导致“切一次才好”的错觉）
+        // 这里保持空，等待 Verify 写入 localStorage
+        setPubAddress("");
+      }
+    };
+
+    const onAuthUpdated = () => {
+      void applyFromStorage("vault-auth-updated");
+    };
+
+    window.addEventListener("vault-auth-updated", onAuthUpdated);
+
+    // 首次尝试
+    void applyFromStorage("mount");
+
+    // 轮询等待 Verify 写入（最多 15 次 * 200ms = 3s）
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      tries += 1;
+      const { addr, role } = readPublisherAuthFromStorage();
+      if ((role === "publisher" || role === "author") && isHexAddress(addr)) {
+        void applyFromStorage("poll");
+        window.clearInterval(timer);
+        return;
+      }
+      if (tries >= 15) window.clearInterval(timer);
+    }, 200);
+
+    // 无论有没有地址，先让 UI 出来（避免一直转圈）
+    const uiTimer = window.setTimeout(() => {
+      if (!stopped) setLoading(false);
+    }, 400);
+
+    return () => {
+      stopped = true;
+      window.removeEventListener("vault-auth-updated", onAuthUpdated);
+      window.clearInterval(timer);
+      window.clearTimeout(uiTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 进入/刷新时：刷新仪表盘（REAL only）
   useEffect(() => {
     fetchDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [envMode]);
+  }, []);
 
   // real search debounce
   useEffect(() => {
@@ -355,37 +478,6 @@ export default function PublisherAdminLayout() {
     return () => window.clearTimeout(timer);
   }, [bookQuery, envMode, pubAddress]);
 
-  // init
-  useEffect(() => {
-    const initPublisher = async () => {
-      const authAddr = localStorage.getItem("vault_pub_auth");
-      const authRole = localStorage.getItem("vault_user_role");
-
-      if (!authAddr || (authRole !== "publisher" && authRole !== "author")) {
-        // mock fallback
-        const rand = Math.random().toString(16).slice(2);
-        const mockAddr = `0x${rand.padEnd(40, "0").slice(0, 40)}`;
-        setPubAddress(mockAddr);
-        localStorage.setItem("vault_pub_auth", mockAddr);
-        localStorage.setItem("vault_user_role", "publisher");
-      } else {
-        setPubAddress(authAddr);
-      }
-
-      // ✅ 初次进入拉一次余额（CFX + USDT）
-      try {
-        await fetchPublisherBalanceDataInternal(authAddr || "");
-      } catch {
-        // ignore
-      }
-
-      setLoading(false);
-    };
-
-    initPublisher();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
       if (envMode === "real") {
@@ -415,6 +507,7 @@ export default function PublisherAdminLayout() {
         return;
       }
 
+      // unreachable (envMode forced real), but kept for reference
       const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
         address: `0x${book.id}${"0".repeat(40 - book.id.length)}`,
         symbol: book.symbol,
@@ -448,66 +541,6 @@ export default function PublisherAdminLayout() {
     }
   };
 
-  // ✅ 拉 USDT 余额（链上 RPC；只是显示用）
-  const fetchUsdtBalanceInternal = async (tokenAddr?: string) => {
-    const owner = (pubAddress || "").trim();
-    const rpcUrl = RPC_URL;
-    const usdtAddr = (tokenAddr || USDT_ADDRESS || "").trim();
-
-    if (!isHexAddress(owner) || !isHexAddress(usdtAddr)) {
-      setBalanceUSDT(0);
-      return;
-    }
-
-    const r = await getErc20Balance(rpcUrl, usdtAddr, owner);
-    if (r?.ok) {
-      const n = Number(r.balance);
-      setBalanceUSDT(Number.isFinite(n) ? n : 0);
-    }
-  };
-
-  // ✅ 统一拉余额（CFX + USDT）
-  const fetchPublisherBalanceDataInternal = async (preferAddress?: string, token?: { address?: string }) => {
-    const publisher = (preferAddress || pubAddress || "").trim();
-    if (!publisher) return;
-
-    setBalanceLoading(true);
-    setUsdtLoading(true);
-
-    try {
-      const codeHash = localStorage.getItem("vault_code_hash") || "";
-      const result = await getPublisherBalance(publisher, codeHash);
-      if (result.ok) {
-        setBalanceCFX(parseFloat(result.balance));
-        setMaxDeploys(result.maxDeploys);
-      }
-      await fetchUsdtBalanceInternal(token?.address);
-    } finally {
-      setBalanceLoading(false);
-      setUsdtLoading(false);
-    }
-  };
-
-  const fetchPublisherBalanceData = async () => {
-    try {
-      await fetchPublisherBalanceDataInternal();
-      showToast("余额已刷新", "success");
-    } catch (e: any) {
-      showToast(e?.message || "获取余额失败", "error");
-      if (envMode === "mock") {
-        setBalanceCFX((prev) => prev || 125.5);
-        setMaxDeploys((prev) => prev || 12);
-        setBalanceUSDT((prev) => prev || 88.0);
-      }
-    }
-  };
-
-  const refreshAfterTopup = async (token?: { symbol?: string; address?: string }) => {
-    await new Promise((r) => setTimeout(r, 600));
-    await fetchPublisherBalanceDataInternal(undefined, token);
-    showToast(`余额已自动刷新${token?.symbol ? `（${token.symbol}）` : ""}`, "success");
-  };
-
   // ✅ REAL 部署：不再用 MetaMask，直接让后端(用Redis私钥)扣费+部署
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
@@ -519,27 +552,6 @@ export default function PublisherAdminLayout() {
     setError(null);
 
     try {
-      if (envMode === "mock") {
-        const mockBookAddr = `0x${Math.random().toString(16).slice(2).padEnd(40, "0").slice(0, 40)}`;
-        const mockTx = `0x${Math.random().toString(16).slice(2).padEnd(64, "0").slice(0, 64)}`;
-        setContractAddr(mockBookAddr);
-
-        const newBook: BookSales = {
-          address: mockBookAddr,
-          symbol: symbol.toUpperCase(),
-          name: bookName,
-          author: author || "未知作者",
-          sales: 0,
-          explorerUrl: "#",
-        };
-
-        const nextBooks = [newBook, ...loadBooksFromStorage()];
-        saveBooksToStorage(nextBooks);
-        setBookSales(nextBooks);
-        showToast(`Demo：合约部署成功！${symbol.toUpperCase()}`, "success", mockTx);
-        return;
-      }
-
       const ok = window.confirm(
         `部署将由后端自动完成：\n- 从出版社余额扣除 ${DEPLOY_FEE_USDT} USDT（防垃圾费）\n- 然后部署合约\n\n继续？\n收款地址：${TREASURY_ADDRESS}`
       );
@@ -550,7 +562,7 @@ export default function PublisherAdminLayout() {
 
       const publisher = (pubAddress || "").trim();
       if (!isHexAddress(publisher)) {
-        throw new Error(`publisher 地址无效（需要 0x + 40 位十六进制）：${publisher}`);
+        throw new Error(`publisher 地址无效（需要 0x + 40 位十六进制）：${publisher || "(empty)"}`);
       }
 
       const url = `${origin()}/api/v1/publisher/deploy-book`;
@@ -571,7 +583,7 @@ export default function PublisherAdminLayout() {
       // 后端可能会返回 bookAddr 为空（如果没等receipt解析事件），这里做兼容
       if (result.bookAddr) setContractAddr(result.bookAddr);
 
-      // ✅ 扣费成功后，立刻刷新 USDT 余额（你要的 10100 -> 10090）
+      // ✅ 扣费成功后，立刻刷新 USDT 余额
       await refreshAfterTopup({ symbol: "USDT", address: USDT_ADDRESS });
 
       const txHash = result.txHash || "";
@@ -590,7 +602,6 @@ export default function PublisherAdminLayout() {
       saveBooksToStorage(nextBooks);
       setBookSales(nextBooks);
 
-      // feeTxHash 也展示一下（更像“支付+部署”）
       const feeTxHash = result.feeTxHash;
       if (feeTxHash) {
         showToast(`已扣除 ${DEPLOY_FEE_USDT} USDT，合约部署交易已发出`, "success", feeTxHash);
@@ -625,12 +636,6 @@ export default function PublisherAdminLayout() {
     setError(null);
 
     try {
-      if (envMode === "mock") {
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        showToast(`Demo：已生成 ${n} 个二维码（ZIP）`, "success");
-        return;
-      }
-
       const url = `${origin()}/api/v1/publisher/zip?count=${encodeURIComponent(String(n))}&contract=${encodeURIComponent(
         contractAddr
       )}`;
@@ -644,13 +649,12 @@ export default function PublisherAdminLayout() {
       const blob = await res.blob();
       const dlUrl = window.URL.createObjectURL(blob);
 
-      // ✅ 同域名情况下 res.headers 直接可读；若未来跨域，也可在后端加 Expose-Headers
       const cd = res.headers.get("content-disposition") || "";
       const filename = pickFilenameFromContentDisposition(cd, `WhaleVault_Codes_${n}_${Date.now()}.zip`);
 
       const a = document.createElement("a");
       a.href = dlUrl;
-      a.download = filename; // ✅ 不再写死，使用后端返回的带时间戳文件名
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -749,26 +753,15 @@ export default function PublisherAdminLayout() {
                 PUBLISHER TERMINAL
               </h1>
 
-              <button
-                onClick={toggleEnvMode}
-                className={`px-3 py-1 rounded text-sm ${
-                  envMode === "mock" ? "bg-yellow-500 text-white" : "bg-green-600 text-white"
-                }`}
-                title="一键切换 Mock / Real"
-              >
-                {envMode === "mock" ? "MOCK 模式" : "REAL 模式"}
-              </button>
+              {/* ✅ Hackathon: 隐藏 Mock/Real 切换按钮（仍强制 REAL） */}
+              {null}
 
               <div className="flex items-center gap-2">
                 <p className="text-xs text-slate-400 font-mono">
                   {(pubAddress || "").slice(0, 6)}...{(pubAddress || "").slice(-4)}
                 </p>
-                <span
-                  className={`text-[10px] ${
-                    envMode === "mock" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-                  } px-2 py-0.5 rounded-full font-medium`}
-                >
-                  {envMode === "mock" ? "Demo" : "Dev API"}
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                  Live API
                 </span>
               </div>
 

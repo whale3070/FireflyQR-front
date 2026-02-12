@@ -35,7 +35,15 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [invalidCode, setInvalidCode] = useState(false);
 
+  /**
+   * ✅ 修复“必须切 mock 再切回来才自动填充”的根因：
+   * - useApi() 里的 verifyCode/getBinding 会随 isMockMode 变化而变化（closure 绑定）
+   * - 某些情况下首屏渲染时 isMockMode 还没稳定（或被旧 localStorage 覆盖），导致第一次 verify 用了错误模式
+   * - 把 isMockMode 加入依赖，并在 role=publisher/author 时尽可能从 verifyResult 里直接拿地址并写入 localStorage
+   */
   useEffect(() => {
+    let cancelled = false;
+
     const initTerminal = async () => {
       setLoading(true);
       setError('');
@@ -51,11 +59,12 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
 
       try {
         // 1) 先 verify，拿 role
-        const verifyResult = await verifyCode(codeHash);
+        const verifyResult: any = await verifyCode(codeHash);
+        if (cancelled) return;
 
-        if (!verifyResult.ok || verifyResult.error) {
+        if (!verifyResult?.ok || verifyResult?.error) {
           setInvalidCode(true);
-          setError(verifyResult.error || '无效的二维码，请购买正版商品');
+          setError(verifyResult?.error || '无效的二维码，请购买正版商品');
           setLoading(false);
           return;
         }
@@ -65,27 +74,58 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
 
         setRole(detectedRole);
 
-        // 2) ✅ 关键修复：只有 reader 才去 getBinding
-        // 因为你的后端设计是：publisher/author 的 get-binding 直接 404（严格防误授权）
+        // 2) ✅ publisher/author：尽量直接从 verifyResult 拿到绑定地址（避免依赖 mock 切换触发的二次渲染）
+        // 兼容不同字段名：address / owner / publisher / admin_address
+        if (detectedRole === 'publisher' || detectedRole === 'author') {
+          const addrCandidate =
+            (verifyResult.address ||
+              verifyResult.owner ||
+              verifyResult.publisher ||
+              verifyResult.admin_address ||
+              verifyResult.adminAddress ||
+              '') as string;
+
+          const addr = (addrCandidate || '').trim();
+
+          if (isHexAddress(addr)) {
+            setTargetAddress(addr.toLowerCase());
+
+            // ✅ 关键：直接写入 localStorage，让 /publisher-admin 立刻读到（无需“切换模式”触发）
+            localStorage.setItem('vault_pub_auth', addr.toLowerCase());
+            localStorage.setItem('vault_user_role', detectedRole);
+            localStorage.setItem('vault_code_hash', codeHash);
+
+            // ✅ 通知其它页面（如果有人在监听）
+            window.dispatchEvent(new Event('vault-auth-updated'));
+          } else {
+            // 仍允许用户手工填
+            setTargetAddress('');
+          }
+
+          setLoading(false);
+          return;
+        }
+
+        // 3) ✅ reader：才去 getBinding（你的后端设计 publisher/author 可能 404）
         if (detectedRole === 'reader') {
           try {
-            const bindResult = await getBinding(codeHash);
+            const bindResult: any = await getBinding(codeHash);
+            if (cancelled) return;
 
-            if (!bindResult.ok || bindResult.error) {
+            if (!bindResult?.ok || bindResult?.error) {
               setInvalidCode(true);
-              setError(bindResult.error || '无效的二维码，请购买正版商品');
+              setError(bindResult?.error || '无效的二维码，请购买正版商品');
               setLoading(false);
               return;
             }
 
-            if (bindResult.address) setTargetAddress(bindResult.address);
+            if (bindResult.address) setTargetAddress(String(bindResult.address).trim());
 
             // 优先用后端返回的 book_address；否则用 URL 兜底
-            const ba = (bindResult.book_address || '').trim();
+            const ba = String(bindResult.book_address || '').trim();
             if (ba) setBookAddress(ba);
             else if (contractFromUrl) setBookAddress(contractFromUrl);
           } catch (bindError: any) {
-            // reader binding 失败，视为无效码（或后端异常）
             setInvalidCode(true);
             setError(bindError?.message || '无效的二维码，请购买正版商品');
             setLoading(false);
@@ -96,6 +136,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         setLoading(false);
       } catch (e: any) {
         console.error('验证失败:', e);
+        if (cancelled) return;
         setInvalidCode(true);
         setError(e?.message || '无效的二维码，请购买正版商品');
         setLoading(false);
@@ -103,7 +144,10 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     };
 
     initTerminal();
-  }, [codeHash, verifyCode, getBinding, contractFromUrl]);
+    return () => {
+      cancelled = true;
+    };
+  }, [codeHash, verifyCode, getBinding, contractFromUrl, isMockMode]);
 
   const confirmAndGoToMint = () => {
     const params = new URLSearchParams();
@@ -175,6 +219,8 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     localStorage.setItem('vault_user_role', role || 'publisher');
     localStorage.setItem('vault_code_hash', codeHash);
 
+    window.dispatchEvent(new Event('vault-auth-updated'));
+
     if (role === 'publisher' || role === 'author') {
       navigate('/publisher-admin');
     }
@@ -229,7 +275,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           <div className="text-center space-y-6">
             <div className="space-y-1">
               <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">预设确权地址</p>
-              <p className="text-xs font-mono text-slate-600 break-all">{targetAddress || '0x...'}</p>
+              <p className="text-xs font-mono text-slate-600 break-all px-2">{targetAddress || '0x...'}</p>
             </div>
 
             {(bookAddress || contractFromUrl) && (
@@ -268,6 +314,11 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-mono text-center outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
                 placeholder="0x..."
               />
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {targetAddress
+                  ? '已自动填充（可修改）。'
+                  : '未能从二维码中解析出地址：请手动输入。若你希望也能自动填充，请让后端 verifyCode 返回 address 字段。'}
+              </p>
             </div>
 
             <button

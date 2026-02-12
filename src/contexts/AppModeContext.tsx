@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+  useEffect,
+} from 'react';
 
 type AppMode = 'mock' | 'dev';
 
@@ -14,11 +21,19 @@ interface AppModeContextType {
 const AppModeContext = createContext<AppModeContextType | undefined>(undefined);
 
 export const AppModeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // ✅ 默认 dev；只有明确保存为 mock 才进入 mock
   const [mode, setModeState] = useState<AppMode>(() => {
-    // 从 localStorage 读取保存的模式
     const saved = localStorage.getItem('app-mode');
-    return (saved === 'dev' ? 'dev' : 'mock') as AppMode;
+    return (saved === 'mock' ? 'mock' : 'dev') as AppMode;
   });
+
+  // ✅ 防止历史脏值
+  useEffect(() => {
+    const saved = localStorage.getItem('app-mode');
+    if (saved !== 'mock' && saved !== 'dev') {
+      localStorage.setItem('app-mode', 'dev');
+    }
+  }, []);
 
   const setMode = useCallback((newMode: AppMode) => {
     setModeState(newMode);
@@ -35,7 +50,7 @@ export const AppModeProvider: React.FC<{ children: ReactNode }> = ({ children })
     isDevMode: mode === 'dev',
     toggleMode,
     setMode,
-    apiBaseUrl: mode === 'dev' ? '' : '',
+    apiBaseUrl: '', // 你现在是同域部署，这里保持空字符串即可
   };
 
   return (
