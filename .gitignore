@@ -6,3 +6,4 @@ cache/
 .DS_Store
 # 如果 backend 下也有 node_modules
 backend/node_modules/
+public/whale-vault-pitch-deck.mp4
