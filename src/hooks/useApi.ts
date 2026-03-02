@@ -196,6 +196,41 @@ export const useApi = () => {
   );
 
   /**
+   * POST /relay/scan/record - 记录扫码并领取红包
+   */
+  const claimRedPacket = useCallback(
+    async (codeHash: string, scannerAddress: string) => {
+      return apiFetch<ApiResponse<{
+        first_scan_time: string;
+        location: string;
+        reward_amount: number;
+        sku: string;
+        scan_count: number;
+      }>>(
+        `/relay/scan/record`,
+        {
+          method: "POST",
+          body: JSON.stringify({ codeHash, scannerAddress }),
+        },
+        async () => {
+          await mockDelay(600);
+          return {
+            ok: true,
+            data: {
+              first_scan_time: new Date().toLocaleString("zh-CN"),
+              location: "北京市|116.4074,39.9042",
+              reward_amount: Math.round((Math.random() * 8 + 2) * 100) / 100, // 2-10元
+              sku: "0xMOCK_BOOK_ADDRESS",
+              scan_count: Math.floor(Math.random() * 10) + 1,
+            },
+          };
+        }
+      );
+    },
+    [apiFetch]
+  );
+
+  /**
    * POST /relay/reward
    */
   const claimReward = useCallback(
@@ -359,6 +394,7 @@ export const useApi = () => {
     // 返利
     saveCode,
     claimReward,
+    claimRedPacket,
     getLeaderboard,
 
     // 出版社

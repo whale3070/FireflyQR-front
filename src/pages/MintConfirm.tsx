@@ -13,7 +13,7 @@ export default function MintConfirm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
-  const { mintNFT, queryTransaction, getBinding } = useApi();
+  const { mintNFT, queryTransaction, getBinding, claimRedPacket } = useApi();
 
   const [error, setError] = useState<string | null>(null);
   const [mintStatus, setMintStatus] = useState<string>("");
@@ -113,9 +113,27 @@ export default function MintConfirm() {
           throw new Error(mintResult?.error || "铸造失败（未返回 tx_hash）");
         }
 
-        // 3) 可选：本页轮询确认后再跳转（现在先不强制，避免等待太久）
-        // const confirmed = await pollTransactionStatus(txHash);
-        // const status = confirmed.success ? "success" : "pending";
+        // 3) 领取红包
+        setMintStatus("正在领取红包...");
+        let redPacketInfo = {
+          reward_amount: 0,
+          location: "",
+          first_scan_time: "",
+          scan_count: 0,
+        };
+        try {
+          const redPacketResult: any = await claimRedPacket(codeHash, readerAddress);
+          if (redPacketResult?.ok && redPacketResult?.data) {
+            redPacketInfo = {
+              reward_amount: redPacketResult.data.reward_amount || 0,
+              location: redPacketResult.data.location || "",
+              first_scan_time: redPacketResult.data.first_scan_time || "",
+              scan_count: redPacketResult.data.scan_count || 0,
+            };
+          }
+        } catch (e) {
+          console.warn("领取红包失败（不影响主流程）:", e);
+        }
 
         setMintStatus("正在跳转...");
 
@@ -125,6 +143,11 @@ export default function MintConfirm() {
           codeHash,
           status: "pending",
           txHash,
+          // 红包信息
+          reward_amount: redPacketInfo.reward_amount.toString(),
+          location: redPacketInfo.location,
+          first_scan_time: redPacketInfo.first_scan_time,
+          scan_count: redPacketInfo.scan_count.toString(),
         });
 
         navigate(`/success?${query.toString()}`, { replace: true });
@@ -136,7 +159,7 @@ export default function MintConfirm() {
 
     performMint();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codeHash, hasStarted, isMockMode, mintNFT, getBinding, pollTransactionStatus, navigate, bookIdRaw]);
+  }, [codeHash, hasStarted, isMockMode, mintNFT, getBinding, claimRedPacket, pollTransactionStatus, navigate, bookIdRaw]);
 
   if (error) {
     const getErrorInfo = () => {

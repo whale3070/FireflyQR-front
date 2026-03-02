@@ -52,6 +52,16 @@ const Success: React.FC = () => {
   // ✅ Do NOT default to a fake address; keep empty if not provided.
   const userAddress = (searchParams.get('address') || '').trim().toLowerCase();
 
+  // 红包信息
+  const redPacketInfo = useMemo(() => {
+    return {
+      rewardAmount: parseFloat(searchParams.get('reward_amount') || '0'),
+      location: (searchParams.get('location') || '').split('|')[0] || '未知', // 只取城市名
+      firstScanTime: searchParams.get('first_scan_time') || '',
+      scanCount: parseInt(searchParams.get('scan_count') || '0', 10),
+    };
+  }, [searchParams]);
+
   const initialStatus = (searchParams.get('status') as TxStatus) || 'pending';
 
   const [txStatus, setTxStatus] = useState<TxStatus>(initialStatus);
@@ -426,6 +436,36 @@ const Success: React.FC = () => {
             <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">⚡ 缓存数据</div>
           )}
         </div>
+
+        {/* 红包信息 */}
+        {redPacketInfo.rewardAmount > 0 && (
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-3xl p-6 space-y-4 shadow-soft">
+            <div className="text-center space-y-2">
+              <span className="text-3xl">🧧</span>
+              <h3 className="text-lg font-bold text-red-600">红包领取成功</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="bg-white rounded-2xl p-4 border border-red-100">
+                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">红包金额</p>
+                <p className="text-2xl font-black text-red-500">¥{redPacketInfo.rewardAmount.toFixed(2)}</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 border border-red-100">
+                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">扫码次数</p>
+                <p className="text-2xl font-black text-orange-500">第 {redPacketInfo.scanCount} 次</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2 text-slate-600">
+                <MapPin className="w-4 h-4 text-red-400" />
+                <span>{redPacketInfo.location}</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <Clock className="w-4 h-4 text-red-400" />
+                <span>{redPacketInfo.firstScanTime || '刚刚'}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3">
           <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest text-center mb-1">

@@ -346,7 +346,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-slate-800">确权博弈提醒</h3>
               <p className="text-sm text-slate-500 leading-relaxed px-2">
-                领取 NFT 会使该激活码失效。<br />
+                领取 NFT 与金额随机的红包奖励，同时会使该激活码失效。<br />
                 <span className="text-amber-600 font-medium">
                   若您有推荐人，请确保其已在系统中登记您的激活码，否则他将无法获得推广奖励。
                 </span>
