@@ -28,7 +28,7 @@ fi
 
 cd "$SOURCE_DIR"
 
-# 1. 前端编译
+# 1. 前端编译 🔥【这里已加内存限制，不会卡死】
 echo "📦 正在执行前端构建..."
 # 优先保证 node_modules 正确（可根据你习惯改为 npm install）
 if [ -f "package-lock.json" ]; then
@@ -37,7 +37,8 @@ else
   npm install
 fi
 
-npm run build
+# 🔴 修复：限制 Node 内存为 1GB，防止服务器卡死
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # 2. 检查 dist 是否生成
 if [ ! -d "$DIST_DIR" ]; then

@@ -2,45 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { 
-  color-scheme: light; 
-  --background: 248 250 252;
-  --foreground: 15 23 42;
+/* 白酒防伪溯源 · 防二次灌装 — 主题变量 */
+:root {
+  color-scheme: light;
+  --background: 250 248 245; /* #FAF8F5 米白 */
+  --foreground: 44 24 16;     /* #2C1810 深褐 */
   --card: 255 255 255;
-  --card-foreground: 15 23 42;
-  --primary: 99 102 241;
+  --card-foreground: 44 24 16;
+  --primary: 139 41 66;      /* #8B2942 酒红 */
   --primary-foreground: 255 255 255;
-  --secondary: 241 245 249;
-  --secondary-foreground: 51 65 85;
-  --muted: 241 245 249;
-  --muted-foreground: 100 116 139;
-  --accent: 139 92 246;
-  --accent-foreground: 255 255 255;
-  --destructive: 239 68 68;
-  --border: 226 232 240;
-  --ring: 99 102 241;
+  --secondary: 245 240 232;   /* #F5F0E8 */
+  --secondary-foreground: 44 24 16;
+  --muted: 245 240 232;
+  --muted-foreground: 107 90 82;
+  --accent: 201 162 39;      /* #C9A227 金 */
+  --accent-foreground: 44 24 16;
+  --destructive: 185 28 28;
+  --border: 232 224 213;      /* #E8E0D5 */
+  --ring: 139 41 66;
 }
 
 body {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(160deg, #FAF8F5 0%, #F5F0E8 50%, #EDE6DC 100%);
   min-height: 100vh;
+  color: #2C1810;
 }
 
-/* 浅色主题下的滚动条 */
+/* 标题使用衬线体（稳重、可信） */
+h1, h2, h3, .font-display {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+}
+
+/* 滚动条 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #F5F0E8;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #D4C4B0;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #C9A227;
 }

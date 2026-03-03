@@ -58,7 +58,7 @@ export default function App() {
   return (
     <AppModeProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-[#0b0e11] flex flex-col text-[#d1d4dc]">
+        <div className="min-h-screen bg-[#2C1810] flex flex-col text-[#F5F0E8] font-sans">
           <ModeSwitcher />
 
           <main style={{ minHeight: "80vh", position: "relative", flexGrow: 1 }}>
@@ -98,11 +98,11 @@ export default function App() {
               <Route
                 path="*"
                 element={
-                  <div className="flex flex-col items-center justify-center h-[60vh]">
-                    <h1 className="text-4xl font-bold text-[#2962ff] mb-4">404</h1>
-                    <p className="text-white/60 text-sm">TERMINAL ERROR: PATH NOT FOUND</p>
-                    <Link to="/bookshelf" className="mt-6 text-[#2962ff] underline">
-                      返回大盘列表
+                  <div className="flex flex-col items-center justify-center h-[60vh] font-display">
+                    <h1 className="text-4xl font-bold text-gold mb-4">404</h1>
+                    <p className="text-[#F5F0E8]/70 text-sm">Page not found</p>
+                    <Link to="/bookshelf" className="mt-6 text-accent hover:text-accent-light underline">
+                      Back to list
                     </Link>
                   </div>
                 }
@@ -110,27 +110,27 @@ export default function App() {
             </Routes>
           </main>
 
-          <footer className="bg-[#131722] border-t border-[#1e222d] px-8 py-4">
-            <div className="max-w-[1600px] mx-auto flex justify-between items-center text-[10px] text-[#5d606b]">
+          <footer className="bg-primary-dark border-t border-primary/40 px-8 py-4">
+            <div className="max-w-[1600px] mx-auto flex justify-between items-center text-[10px] text-accent-light/80">
               <div className="flex gap-6">
-                <Link to="/bookshelf" className="hover:text-[#2962ff] uppercase tracking-tighter">
-                  Market
+                <Link to="/bookshelf" className="hover:text-gold uppercase tracking-tighter">
+                  ｜Market
                 </Link>
-                <Link to="/Heatmap" className="hover:text-[#2962ff] uppercase tracking-tighter">
-                  Global Echo
+                <Link to="/Heatmap" className="hover:text-gold uppercase tracking-tighter">
+                  ｜Heatmap
                 </Link>
-                <Link to="/reward" className="hover:text-[#2962ff] uppercase tracking-tighter">
-                  Referral System
+                <Link to="/reward" className="hover:text-gold uppercase tracking-tighter">
+                  ｜Reward
                 </Link>
                 <Link to="/publisher-admin" className="hover:text-white uppercase tracking-tighter">
-                  🏛️ Publisher Admin
+                  ｜Publisher Admin
                 </Link>
                 <Link to="/verify" className="hover:text-white uppercase tracking-tighter">
-                  🔐 Admin Portal
+                  ｜Admin
                 </Link>
               </div>
-              <div className="uppercase tracking-widest text-right">
-                Whale Vault Protocol • Terminal v1.1.2 • Global Web3 Dev Con Hackathon 2026
+              <div className="uppercase tracking-widest text-right text-accent-light/70">
+                Anti-counterfeit · No refill · Whale Vault · Avalanche C-Chain
               </div>
             </div>
           </footer>

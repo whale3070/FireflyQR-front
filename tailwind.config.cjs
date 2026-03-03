@@ -3,21 +3,30 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Noto Sans SC", "PingFang SC", "Microsoft YaHei", "sans-serif"],
+        serif: ["Noto Serif SC", "Songti SC", "SimSun", "serif"],
+      },
       colors: {
-        background: "#f8fafc",
-        foreground: "#0f172a",
+        background: "#FAF8F5",
+        foreground: "#2C1810",
         card: "#ffffff",
-        primary: "#6366f1",
-        accent: "#8b5cf6",
-        muted: "#f1f5f9",
-        border: "#e2e8f0"
+        primary: "#8B2942",
+        "primary-dark": "#6B2033",
+        accent: "#C9A227",
+        "accent-light": "#E8D48B",
+        muted: "#F5F0E8",
+        border: "#E8E0D5",
+        wine: "#8B2942",
+        gold: "#C9A227",
       },
       boxShadow: {
-        glow: "0 0 20px rgba(99, 102, 241, 0.2)",
-        soft: "0 4px 20px rgba(0, 0, 0, 0.08)",
-        card: "0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)"
-      }
-    }
+        glow: "0 0 20px rgba(139, 41, 66, 0.25)",
+        "glow-gold": "0 0 20px rgba(201, 162, 39, 0.2)",
+        soft: "0 4px 20px rgba(44, 24, 16, 0.08)",
+        card: "0 1px 3px rgba(44, 24, 16, 0.08), 0 1px 2px rgba(44, 24, 16, 0.04)",
+      },
+    },
   },
-  plugins: []
-}
+  plugins: [],
+};

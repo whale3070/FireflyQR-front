@@ -742,15 +742,15 @@ export default function PublisherAdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted font-sans">
       <ToastContainer />
 
-      <header className="bg-white/80 backdrop-blur-lg border-b border-slate-200 sticky top-0 z-10 px-6 py-4">
+      <header className="bg-card/95 backdrop-blur-lg border-b border-border sticky top-0 z-10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-6">
             <div>
-              <h1 className="text-xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                PUBLISHER TERMINAL
+              <h1 className="text-xl font-serif font-black text-primary">
+                Anti-counterfeit · Publisher Admin
               </h1>
 
               {/* ✅ Hackathon: 隐藏 Mock/Real 切换按钮（仍强制 REAL） */}
@@ -768,7 +768,7 @@ export default function PublisherAdminLayout() {
               {/* ✅ 明示费用提示（防垃圾费） */}
               {envMode === "real" ? (
                 <div className="mt-1 text-[11px] text-slate-500">
-                  部署会由后端自动完成并扣除 <b>{DEPLOY_FEE_USDT} USDT</b>（防垃圾费）→ 收款地址{" "}
+                  Deployment is done by the backend and <b>{DEPLOY_FEE_USDT} USDT</b> will be deducted (anti-spam fee) → Treasury{" "}
                   {shortenAddress(TREASURY_ADDRESS)}
                 </div>
               ) : null}
