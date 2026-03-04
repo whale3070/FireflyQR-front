@@ -7,3 +7,22 @@ cache/
 # 如果 backend 下也有 node_modules
 backend/node_modules/
 public/whale-vault-pitch-deck.mp4
+
+# Python 虚拟环境（venv 整目录忽略，避免提交 site-packages 等）
+backend/venv/
+
+# 编译产物 / 可执行文件
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.obj
+*.out
+whale-vault-backend
+backend/whale-vault-backend
+.env
+backend/.env
+backend/env.txt
+backend/backend.log
