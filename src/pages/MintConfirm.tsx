@@ -13,14 +13,22 @@ export default function MintConfirm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
-  const { mintNFT, queryTransaction, getBinding, claimRedPacket } = useApi();
+  const { mintNFT, queryTransaction, getBinding, claimRedPacket, getScanInfo } = useApi();
 
   const [error, setError] = useState<string | null>(null);
   const [mintStatus, setMintStatus] = useState<string>("");
   const [hasStarted, setHasStarted] = useState(false);
+  /** 一码一领：该码已领取过，仅展示扫码信息（领取时间、城市、SKU） */
+  const [viewOnlyScanInfo, setViewOnlyScanInfo] = useState<{
+    first_scan_time: string;
+    location: string;
+    sku: string;
+    reward_amount?: number;
+  } | null>(null);
 
   const codeHash = (hashCode || params.get("code") || "").trim();
   const bookIdRaw = params.get("book_id") ?? "1";
+  const viewOnly = params.get("view_only") === "1";
 
   // ✅ 交易轮询（如果你未来要在本页做“确认后再跳转”，可以启用；当前只用于 Success 页自己确认也行）
   const pollTransactionStatus = useCallback(
@@ -63,6 +71,29 @@ export default function MintConfirm() {
       if (!codeHash || hasStarted) return;
       setHasStarted(true);
 
+      // ✅ 一码一领：从 Verify 带 view_only=1 进来时，仅拉取扫码信息展示，不领取
+      if (viewOnly) {
+        setMintStatus("加载扫码信息...");
+        try {
+          const scanRes: any = await getScanInfo(codeHash);
+          if (scanRes?.ok && scanRes?.data) {
+            const d = scanRes.data;
+            const loc = (d.location || "").split("|")[0] || d.location || "";
+            setViewOnlyScanInfo({
+              first_scan_time: d.first_scan_time ?? "",
+              location: loc,
+              sku: d.sku ?? "",
+              reward_amount: d.reward_amount,
+            });
+          } else {
+            setError("该码暂无扫码记录");
+          }
+        } catch (e: any) {
+          setError(e?.message || "加载扫码信息失败");
+        }
+        return;
+      }
+
       // ✅ 你说要删“模拟 mint”，所以：DEMO 模式不允许 mint
       if (isMockMode) {
         setError("MINT_DISABLED_IN_DEMO");
@@ -104,35 +135,36 @@ export default function MintConfirm() {
           return;
         }
 
-        // 2) 发起 mint（必须成功拿到 txHash）
+        // 2) 先扫码记录（一码一领：若已领取过则只展示信息，不再 mint）
+        setMintStatus("正在验证扫码状态...");
+        const redPacketResult: any = await claimRedPacket(codeHash, readerAddress);
+        const alreadyClaimed = redPacketResult?.already_claimed === true;
+        const redPacketInfo = redPacketResult?.ok && redPacketResult?.data
+          ? {
+              reward_amount: redPacketResult.data.reward_amount ?? 0,
+              location: redPacketResult.data.location ?? "",
+              first_scan_time: redPacketResult.data.first_scan_time ?? "",
+              scan_count: redPacketResult.data.scan_count ?? 0,
+            }
+          : { reward_amount: 0, location: "", first_scan_time: "", scan_count: 0 };
+
+        if (alreadyClaimed) {
+          setViewOnlyScanInfo({
+            first_scan_time: redPacketInfo.first_scan_time,
+            location: redPacketInfo.location,
+            sku: (redPacketResult?.data as any)?.sku ?? "",
+            reward_amount: redPacketInfo.reward_amount,
+          });
+          return;
+        }
+
+        // 3) 首次扫码：发起 mint（带 code_hash 以便后端一码一领）
         setMintStatus("正在链上铸造 NFT...");
-        const mintResult: any = await mintNFT(bookAddress, readerAddress);
+        const mintResult: any = await mintNFT(bookAddress, readerAddress, codeHash);
 
         const txHash = (mintResult?.data?.tx_hash || "").trim();
         if (!mintResult?.ok || !txHash) {
           throw new Error(mintResult?.error || "铸造失败（未返回 tx_hash）");
-        }
-
-        // 3) 领取红包
-        setMintStatus("正在领取红包...");
-        let redPacketInfo = {
-          reward_amount: 0,
-          location: "",
-          first_scan_time: "",
-          scan_count: 0,
-        };
-        try {
-          const redPacketResult: any = await claimRedPacket(codeHash, readerAddress);
-          if (redPacketResult?.ok && redPacketResult?.data) {
-            redPacketInfo = {
-              reward_amount: redPacketResult.data.reward_amount || 0,
-              location: redPacketResult.data.location || "",
-              first_scan_time: redPacketResult.data.first_scan_time || "",
-              scan_count: redPacketResult.data.scan_count || 0,
-            };
-          }
-        } catch (e) {
-          console.warn("领取红包失败（不影响主流程）:", e);
         }
 
         setMintStatus("正在跳转...");
@@ -143,7 +175,6 @@ export default function MintConfirm() {
           codeHash,
           status: "pending",
           txHash,
-          // 红包信息
           reward_amount: redPacketInfo.reward_amount.toString(),
           location: redPacketInfo.location,
           first_scan_time: redPacketInfo.first_scan_time,
@@ -159,7 +190,7 @@ export default function MintConfirm() {
 
     performMint();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codeHash, hasStarted, isMockMode, mintNFT, getBinding, claimRedPacket, pollTransactionStatus, navigate, bookIdRaw]);
+  }, [codeHash, hasStarted, viewOnly, isMockMode, mintNFT, getBinding, claimRedPacket, getScanInfo, pollTransactionStatus, navigate, bookIdRaw]);
 
   if (error) {
     const getErrorInfo = () => {
@@ -178,6 +209,15 @@ export default function MintConfirm() {
       }
       if (error === "MISSING_READER_ADDRESS") {
         return { title: "缺少读者地址", desc: "无法从绑定信息中获取读者钱包地址。" };
+      }
+      if (error === "ALREADY_CLAIMED") {
+        return { title: "该码已领取过", desc: "该二维码已领取过 NFT，不可重复领取。" };
+      }
+      if (error === "ONLY_FIRST_SCAN") {
+        return { title: "仅首次扫码者可领取", desc: "仅首次扫码该二维码的地址可领取 NFT。" };
+      }
+      if (error === "SCAN_FIRST") {
+        return { title: "请先扫码", desc: "请先完成扫码再领取。" };
       }
       // 兜底：展示后端/异常信息
       return { title: "铸造失败", desc: String(error) };
@@ -218,6 +258,36 @@ export default function MintConfirm() {
 
         <div className="mt-10 text-xs text-slate-400 uppercase tracking-widest font-medium">
           Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? "DEMO MODE" : "DEV API"}
+        </div>
+      </div>
+    );
+  }
+
+  // 一码一领：已领取过，仅展示扫码信息（领取红包时间、城市、商品 SKU）
+  if (viewOnlyScanInfo) {
+    const loc = viewOnlyScanInfo.location?.split("|")[0] || viewOnlyScanInfo.location || "—";
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-white border border-slate-200 rounded-3xl p-8 text-center space-y-6 shadow-lg">
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto border border-amber-100">
+            <span className="text-amber-600 text-4xl">✓</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-800">该码已领取过</h1>
+          <p className="text-sm text-slate-500">仅可查看之前的扫码信息，不可重复领取 NFT。</p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left space-y-2">
+            <p className="text-xs text-slate-500 font-medium">领取红包时间</p>
+            <p className="text-sm text-slate-800">{viewOnlyScanInfo.first_scan_time || "—"}</p>
+            <p className="text-xs text-slate-500 font-medium mt-3">城市</p>
+            <p className="text-sm text-slate-800">{loc}</p>
+            <p className="text-xs text-slate-500 font-medium mt-3">商品 SKU</p>
+            <p className="text-sm font-mono text-slate-800 break-all">{viewOnlyScanInfo.sku || "—"}</p>
+          </div>
+          <button
+            onClick={() => navigate("/bookshelf", { replace: true })}
+            className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all"
+          >
+            返回
+          </button>
         </div>
       </div>
     );

@@ -82,7 +82,7 @@ const Heatmap: React.FC = () => {
     // ✅ 强过滤：清洗掉 NaN / 越界 / 非法结构，避免 ECharts 内部压缩报错
     const cleaned = result.regions
       .map((r: any) => {
-        const name = String(r?.name || "Unknown");
+        const name = (r?.name === "Unknown" || !r?.name) ? "未知" : String(r.name);
         const lng = safeNum(r?.value?.[0], NaN);
         const lat = safeNum(r?.value?.[1], NaN);
         const cnt = safeNum(r?.value?.[2], 0);

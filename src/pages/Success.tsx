@@ -16,6 +16,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { useAppMode } from '../contexts/AppModeContext';
+import { EXPLORER_URL } from '../config/chain';
 import { mockDelay, MOCK_REGIONS, getRandomBook } from '../data/mockData';
 import { useApi } from '../hooks/useApi';
 
@@ -28,6 +29,10 @@ interface TxData {
   contract: string;
   txHash: string;
   cached?: boolean;
+  blockNumber?: number | string;
+  blockTimestamp?: number | string;
+  from?: string;
+  to?: string;
 }
 
 // --- Helpers ---
@@ -54,9 +59,11 @@ const Success: React.FC = () => {
 
   // 红包信息
   const redPacketInfo = useMemo(() => {
+    const raw = (searchParams.get('location') || '').split('|')[0] || '';
+    const location = (raw === 'Unknown' || !raw) ? '未知' : raw;
     return {
       rewardAmount: parseFloat(searchParams.get('reward_amount') || '0'),
-      location: (searchParams.get('location') || '').split('|')[0] || '未知', // 只取城市名
+      location,
       firstScanTime: searchParams.get('first_scan_time') || '',
       scanCount: parseInt(searchParams.get('scan_count') || '0', 10),
     };
@@ -87,10 +94,9 @@ const Success: React.FC = () => {
     return c ? c.toLowerCase() : '';
   }, [txData?.contract, contractFromUrl]);
 
-  // ✅ Explorer base: Conflux eSpace Testnet (CHAIN_ID=71)
   const explorerTxUrl = useMemo(() => {
     if (!txHash) return '';
-    return `https://evmtestnet.confluxscan.io/tx/${txHash}`;
+    return `${EXPLORER_URL}/tx/${txHash}`;
   }, [txHash]);
 
   const openTxInExplorer = useCallback(() => {
@@ -123,6 +129,10 @@ const Success: React.FC = () => {
           contract: resolvedContract ? resolvedContract.toLowerCase() : '',
           txHash: String(d.txHash || txHash),
           cached: Boolean(d.cached),
+          blockNumber: d.blockNumber,
+          blockTimestamp: d.blockTimestamp,
+          from: d.from ? String(d.from).toLowerCase() : '',
+          to: d.to ? String(d.to).toLowerCase() : '',
         });
 
         const upper = String(d.status || '').toUpperCase();
@@ -161,11 +171,19 @@ const Success: React.FC = () => {
     setTxStatus(initialStatus || 'pending');
   }, [initialStatus]);
 
-  // auto-check once when we come from mint flow
+  // 进入页面时查一次
   useEffect(() => {
     if (!txHash) return;
     if (initialStatus === 'pending') checkTxStatus();
   }, [txHash, initialStatus, checkTxStatus]);
+
+  // pending 时每 3 秒自动轮询，确认后回显交易详情
+  useEffect(() => {
+    if (txStatus !== 'pending' && txStatus !== 'syncing') return;
+    if (!txHash) return;
+    const t = setInterval(() => checkTxStatus(), 3000);
+    return () => clearInterval(t);
+  }, [txStatus, txHash, checkTxStatus]);
 
   /**
    * Load Conflux Faucet Plugin
@@ -215,33 +233,23 @@ const Success: React.FC = () => {
   const displayTokenId =
     txData?.tokenId && txData.tokenId !== '0' ? `#${txData.tokenId}` : '#---';
 
-  // ---------- Pending / Syncing ----------
+  // ---------- Pending / Syncing (RWA 防二次灌装) ----------
   if (txStatus === 'pending' || txStatus === 'syncing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
-        <div className="max-w-md w-full space-y-8">
-          <div
-            className={`${
-              isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
-            } border rounded-lg p-2 text-center`}
-          >
-            <p
-              className={`text-xs font-semibold uppercase tracking-wider ${
-                isMockMode ? 'text-amber-700' : 'text-emerald-700'
-              }`}
-            >
-              {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
-            </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-8 px-4">
+        <div className="max-w-md w-full space-y-6">
+          <div className="text-center py-2">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">RWA 防二次灌装 · 正品确权</p>
           </div>
 
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-3">
             <div className="flex justify-center relative">
               <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
                 <Clock className="w-8 h-8 text-amber-600 animate-pulse" />
               </div>
             </div>
-            <h2 className="text-2xl font-black text-slate-800">交易已提交</h2>
-            <p className="text-slate-500 text-sm">区块链数据同步中...</p>
+            <h2 className="text-xl font-black text-slate-800">交易已提交</h2>
+            <p className="text-slate-500 text-sm">区块链确认后，将显示红包 0.1 USDT</p>
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-4">
@@ -283,13 +291,14 @@ const Success: React.FC = () => {
             链上哈希核验
           </button>
 
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <button
               onClick={() => navigate('/bookshelf')}
               className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
             >
               返回书架
             </button>
+            <p className="text-xs text-slate-400 uppercase tracking-widest">RWA 防二次灌装 · No Refill</p>
           </div>
         </div>
       </div>
@@ -299,8 +308,11 @@ const Success: React.FC = () => {
   // ---------- Failed ----------
   if (txStatus === 'failed') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
-        <div className="max-w-md w-full space-y-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-8 px-4">
+        <div className="max-w-md w-full space-y-6">
+          <div className="text-center py-2">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">RWA 防二次灌装 · 正品确权</p>
+          </div>
           <div className="text-center space-y-4">
             <div className="flex justify-center">
               <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
@@ -334,36 +346,35 @@ const Success: React.FC = () => {
           >
             返回书架
           </button>
+          <p className="text-center text-xs text-slate-400 uppercase tracking-widest pt-4">RWA 防二次灌装 · No Refill</p>
         </div>
       </div>
     );
   }
 
-  // ---------- Success ----------
+  // ---------- Success (RWA 防二次灌装) ----------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div
-          className={`${
-            isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
-          } border rounded-lg p-2 text-center`}
-        >
-          <p
-            className={`text-xs font-semibold uppercase tracking-wider ${
-              isMockMode ? 'text-amber-700' : 'text-emerald-700'
-            }`}
-          >
-            {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-8 px-4">
+      <div className="max-w-md w-full space-y-6">
+        {/* RWA 防二次灌装 品牌条 */}
+        <div className="text-center py-2">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">RWA 防二次灌装 · 正品确权</p>
         </div>
 
-        <div className="text-center space-y-4">
+        {/* 恭喜获得红包 - 主提示 */}
+        <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-6 text-center shadow-lg border border-amber-300">
+          <p className="text-amber-900/90 text-sm font-medium mb-2">恭喜你，获得红包</p>
+          <p className="text-3xl font-black text-white">0.1 USDT</p>
+          <p className="text-amber-100 text-xs mt-2">本码已核销，防二次灌装</p>
+        </div>
+
+        <div className="text-center space-y-3">
           <div className="flex justify-center relative">
-            <CheckCircle className="w-16 h-16 text-emerald-500" />
-            <ShieldCheck className="w-6 h-6 text-white bg-emerald-500 rounded-full absolute bottom-0 right-1/2 translate-x-10 border-4 border-slate-50" />
+            <CheckCircle className="w-14 h-14 text-emerald-500" />
+            <ShieldCheck className="w-5 h-5 text-white bg-emerald-500 rounded-full absolute bottom-0 right-1/2 translate-x-8 border-2 border-slate-50" />
           </div>
-          <h2 className="text-2xl font-black text-slate-800">确权成功 !</h2>
-          <p className="text-slate-400 text-xs uppercase tracking-widest">NFT 铸造已完成</p>
+          <h2 className="text-xl font-black text-slate-800">确权成功</h2>
+          <p className="text-slate-500 text-xs">NFT 存证已上链，不可篡改</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-soft">
@@ -434,6 +445,69 @@ const Success: React.FC = () => {
 
           {txData?.cached && (
             <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">⚡ 缓存数据</div>
+          )}
+        </div>
+
+        {/* 链上交易详情（确认成功后回显） */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">链上交易详情</p>
+          <dl className="grid gap-2 text-sm">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <dt className="text-slate-500 shrink-0">Transaction Hash:</dt>
+              <dd className="font-mono text-slate-800 break-all">{txHash || '—'}</dd>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <dt className="text-slate-500 shrink-0">Status:</dt>
+              <dd className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Success
+              </dd>
+            </div>
+            {txData?.blockNumber != null && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <dt className="text-slate-500 shrink-0">Block:</dt>
+                <dd className="font-mono text-slate-800">{String(txData.blockNumber)}</dd>
+              </div>
+            )}
+            {txData?.blockTimestamp != null && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <dt className="text-slate-500 shrink-0">Timestamp:</dt>
+                <dd className="text-slate-800">
+                  {new Date(Number(txData.blockTimestamp) * 1000).toLocaleString('zh-CN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}{' '}
+                  (UTC)
+                </dd>
+              </div>
+            )}
+            {txData?.from && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <dt className="text-slate-500 shrink-0">From:</dt>
+                <dd className="font-mono text-slate-800 break-all">{txData.from}</dd>
+              </div>
+            )}
+            {txData?.to && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <dt className="text-slate-500 shrink-0">To:</dt>
+                <dd className="font-mono text-slate-800 break-all">{txData.to}</dd>
+              </div>
+            )}
+            {effectiveContract && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <dt className="text-slate-500 shrink-0">Created:</dt>
+                <dd className="font-mono text-slate-800 break-all">{effectiveContract}</dd>
+              </div>
+            )}
+          </dl>
+          {explorerTxUrl && (
+            <button
+              type="button"
+              onClick={openTxInExplorer}
+              className="mt-2 flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-indigo-100 text-indigo-700 text-sm font-medium hover:bg-indigo-200"
+            >
+              <ExternalLink className="w-4 h-4" />
+              在区块浏览器中查看
+            </button>
           )}
         </div>
 
@@ -556,6 +630,10 @@ const Success: React.FC = () => {
             </button>
           )}
         </div>
+
+        <p className="text-center text-xs text-slate-400 uppercase tracking-widest pt-4">
+          RWA 防二次灌装 · No Refill
+        </p>
       </div>
     </div>
   );

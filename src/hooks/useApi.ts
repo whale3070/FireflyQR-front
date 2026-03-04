@@ -83,17 +83,20 @@ export const useApi = () => {
   /**
    * ✅ 铸造 NFT（同域后端）
    * POST /relay/mint
-   *
-   * ⚠️ 已按你的要求：删掉 mint mock（Mock 模式会直接报错）
+   * codeHash 可选；传则后端一码一领校验
    */
   const mintNFT = useCallback(
-    async (bookAddress: string, readerAddress: string) => {
+    async (bookAddress: string, readerAddress: string, codeHash?: string) => {
+      const body: { book_address: string; reader_address: string; code_hash?: string } = {
+        book_address: bookAddress,
+        reader_address: readerAddress,
+      };
+      if (codeHash != null && codeHash.trim() !== "") {
+        body.code_hash = codeHash.startsWith("0x") ? codeHash.slice(2) : codeHash.trim();
+      }
       return apiFetch<ApiResponse<{ tx_hash: string }>>(`/relay/mint`, {
         method: "POST",
-        body: JSON.stringify({
-          book_address: bookAddress,
-          reader_address: readerAddress,
-        }),
+        body: JSON.stringify(body),
       });
     },
     [apiFetch]
@@ -197,6 +200,7 @@ export const useApi = () => {
 
   /**
    * POST /relay/scan/record - 记录扫码并领取红包
+   * 若该码已领取过，返回 already_claimed: true，仅可查看扫码信息
    */
   const claimRedPacket = useCallback(
     async (codeHash: string, scannerAddress: string) => {
@@ -206,7 +210,7 @@ export const useApi = () => {
         reward_amount: number;
         sku: string;
         scan_count: number;
-      }>>(
+      }> & { already_claimed?: boolean }>(
         `/relay/scan/record`,
         {
           method: "POST",
@@ -216,6 +220,7 @@ export const useApi = () => {
           await mockDelay(600);
           return {
             ok: true,
+            already_claimed: false,
             data: {
               first_scan_time: new Date().toLocaleString("zh-CN"),
               location: "北京市|116.4074,39.9042",
@@ -225,6 +230,25 @@ export const useApi = () => {
             },
           };
         }
+      );
+    },
+    [apiFetch]
+  );
+
+  /**
+   * GET /relay/scan/info?codeHash=xxx - 仅查询扫码信息（领取红包时间、城市、SKU），不写入
+   */
+  const getScanInfo = useCallback(
+    async (codeHash: string) => {
+      return apiFetch<ApiResponse<{
+        first_scan_time: string;
+        location: string;
+        reward_amount: number;
+        sku: string;
+        scan_count: number;
+      }>>(
+        `/relay/scan/info?codeHash=${encodeURIComponent(codeHash)}`,
+        { method: "GET" }
       );
     },
     [apiFetch]
@@ -328,14 +352,18 @@ export const useApi = () => {
       const provider = new ethers.JsonRpcProvider(rpc);
       const c = new ethers.Contract(token, ERC20_ABI, provider);
 
-      const [raw, decimals, symbol] = await Promise.all([
-        c.balanceOf(owner),
-        c.decimals(),
-        c.symbol().catch(() => "TOKEN"),
-      ]);
-
-      const human = ethers.formatUnits(raw, Number(decimals));
-      return { ok: true, token, owner, symbol, decimals: Number(decimals), balance: human };
+      try {
+        const [raw, decimals, symbol] = await Promise.all([
+          c.balanceOf(owner),
+          c.decimals(),
+          c.symbol().catch(() => "TOKEN"),
+        ]);
+        const human = ethers.formatUnits(raw, Number(decimals));
+        return { ok: true, token, owner, symbol, decimals: Number(decimals), balance: human };
+      } catch (e: any) {
+        // 地址无合约或非 ERC20（如 BAD_DATA / 0x）时不再抛错，返回默认
+        return { ok: true, token, owner, symbol: "—", decimals: 6, balance: "0" };
+      }
     },
     [isMockMode]
   );
@@ -395,6 +423,7 @@ export const useApi = () => {
     saveCode,
     claimReward,
     claimRedPacket,
+    getScanInfo,
     getLeaderboard,
 
     // 出版社

@@ -12,12 +12,12 @@ export default function AddBookPage() {
     handleDeployContract,
   } = useOutletContext<PublisherOutletContext>();
 
-  const buttonText = opLoading ? "支付中 / 部署中..." : "支付 10 USDT 并部署合约";
+  const buttonText = opLoading ? "部署中..." : "部署合约";
 
   return (
     <div className="max-w-lg mx-auto">
       <div className="bg-white rounded-2xl shadow-soft border border-slate-100 p-8">
-        <h2 className="text-lg font-bold text-slate-800 mb-6">📚 部署新书 NFT 合约</h2>
+        <h2 className="text-lg font-bold text-slate-800 mb-6">📚 部署商品SKU的合约地址</h2>
 
         <div
           className={`mb-4 p-3 ${
@@ -28,8 +28,8 @@ export default function AddBookPage() {
         >
           <p className={`text-xs ${envMode === "mock" ? "text-amber-700" : "text-emerald-700"}`}>
             {envMode === "mock"
-              ? "🔧 Demo 模式：合约部署仅为模拟（不会真实扣款）"
-              : `🟢 Dev API：${apiBaseUrl}（部署前会从出版社余额扣除 10 USDT 作为垃圾数据防护）`}
+              ? "🔧 Demo 模式：合约部署仅为模拟"
+              : `🟢 Dev API：${apiBaseUrl}（由后端完成部署）`}
           </p>
         </div>
 
@@ -79,7 +79,7 @@ export default function AddBookPage() {
           </button>
 
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            说明：为了防止链上产生大量垃圾书籍合约，REAL 模式下部署前会要求支付 <b>10 USDT</b>。
+            说明：部署由后端自动完成，请确保网络与权限正常。
           </p>
 
           {contractAddr && (

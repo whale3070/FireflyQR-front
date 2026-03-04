@@ -83,7 +83,7 @@ export default function App() {
               <Route path="/Heatmap" element={<Heatmap />} />
               <Route path="/book/:address" element={<BookDetail />} />
 
-              {/* ✅ 出版社后台（路由化拆分） */}
+              {/* ✅ 商家后台管理系统（路由化拆分） */}
               <Route path="/publisher-admin" element={<PublisherAdminLayout />}>
                 <Route index element={<Navigate to="/publisher-admin/overview" replace />} />
                 <Route path="overview" element={<OverviewPage />} />

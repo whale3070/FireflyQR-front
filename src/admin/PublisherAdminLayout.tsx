@@ -12,7 +12,7 @@ import { useApi } from "../hooks/useApi";
 import { MOCK_BOOKS, MOCK_REGIONS, getTotalSales } from "../data/mockData";
 import { showToast, ToastContainer } from "../components/ui/CyberpunkToast";
 
-import { RPC_URL, USDT_ADDRESS, TREASURY_ADDRESS, DEPLOY_FEE_USDT } from "../config/chain";
+import { RPC_URL, USDT_ADDRESS, TREASURY_ADDRESS, DEPLOY_FEE_USDT, EXPLORER_URL } from "../config/chain";
 
 export interface BookSales {
   address: string;
@@ -21,6 +21,8 @@ export interface BookSales {
   author: string;
   sales: number;
   explorerUrl: string;
+  /** 部署者地址（可选，部署时写入） */
+  deployer?: string;
 }
 export interface RegionRank {
   region: string;
@@ -81,7 +83,12 @@ export type PublisherOutletContext = {
   count: number;
   setCount: (v: number) => void;
 
-  // real search
+  // 已部署书籍列表（下拉框用，real 模式）
+  bookListForDropdown: { bookAddr: string; name?: string; symbol?: string; author?: string; serial?: string }[];
+  bookListLoading: boolean;
+  fetchBookListForDropdown: () => Promise<void>;
+
+  // real search（保留兼容，qrcode 页已改为下拉框）
   bookQuery: string;
   setBookQuery: (v: string) => void;
   bookCandidates: any[];
@@ -108,6 +115,10 @@ const shortenAddress = (addr: string) => {
   return a;
 };
 const isHexAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test((addr || "").trim());
+
+/** 后端可能返回 Unknown，前端统一显示为「未知」 */
+const normalizeRegionName = (name: string) =>
+  !name || name === "Unknown" ? "未知" : name;
 
 /**
  * ✅ IMPORTANT FIX:
@@ -173,7 +184,7 @@ type HeatmapNode = { name: string; value: [number, number, number] };
 function mergeRegionCounts(items: RegionRank[]): RegionRank[] {
   const m = new Map<string, number>();
   for (const it of items) {
-    const key = (it.region || "Unknown").trim() || "Unknown";
+    const key = normalizeRegionName((it.region || "").trim() || "未知");
     const n = Number(it.count);
     m.set(key, (m.get(key) || 0) + (Number.isFinite(n) ? n : 0));
   }
@@ -231,6 +242,10 @@ export default function PublisherAdminLayout() {
   const [serial, setSerial] = useState<string>("");
   const [contractAddr, setContractAddr] = useState<string | null>(null);
   const [count, setCount] = useState<number>(100);
+
+  // 下拉框书籍列表（real 模式）
+  const [bookListForDropdown, setBookListForDropdown] = useState<{ bookAddr: string; name?: string; symbol?: string; author?: string; serial?: string }[]>([]);
+  const [bookListLoading, setBookListLoading] = useState<boolean>(false);
 
   // search
   const [bookQuery, setBookQuery] = useState<string>("");
@@ -478,6 +493,34 @@ export default function PublisherAdminLayout() {
     return () => window.clearTimeout(timer);
   }, [bookQuery, envMode, pubAddress]);
 
+  const fetchBookListForDropdown = async () => {
+    if (envMode !== "real") {
+      setBookListForDropdown([]);
+      return;
+    }
+    setBookListLoading(true);
+    try {
+      const publisher = (pubAddress || "").trim().toLowerCase();
+      const qs = publisher && isHexAddress(publisher) ? `publisher=${encodeURIComponent(publisher)}&` : "";
+      const url = `${origin()}/api/v1/publisher/books?${qs}limit=200&offset=0`;
+      const data = await fetchJsonOrThrow<{ ok: boolean; items?: { bookAddr: string; name?: string; symbol?: string; author?: string; serial?: string }[] }>(url, { method: "GET" });
+      setBookListForDropdown(Array.isArray(data?.items) ? data.items : []);
+    } catch (e: any) {
+      setBookListForDropdown([]);
+      showToast(e?.message || "获取书籍列表失败", "error");
+    } finally {
+      setBookListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (envMode === "real") {
+      fetchBookListForDropdown();
+    } else {
+      setBookListForDropdown([]);
+    }
+  }, [envMode, pubAddress]);
+
   const fetchDashboardData = async () => {
     try {
       if (envMode === "real") {
@@ -488,7 +531,7 @@ export default function PublisherAdminLayout() {
         const heatmapResult = await fetchDistribution();
         if (heatmapResult?.ok && Array.isArray(heatmapResult.regions)) {
           const raw: RegionRank[] = heatmapResult.regions.map((r: any) => {
-            const region = String(r?.name || "Unknown").trim() || "Unknown";
+            const region = normalizeRegionName(String(r?.name || "").trim() || "未知");
             const n = Number(r?.value?.[2]);
             return { region, count: Number.isFinite(n) ? n : 0 };
           });
@@ -521,7 +564,7 @@ export default function PublisherAdminLayout() {
       setTotalSales(getTotalSales());
 
       const ranked: RegionRank[] = MOCK_REGIONS
-        .map((r: any) => ({ region: String(r?.name || "Unknown"), count: Number(r?.value?.[2]) || 0 }))
+        .map((r: any) => ({ region: normalizeRegionName(String(r?.name || "未知")), count: Number(r?.value?.[2]) || 0 }))
         .sort((a: RegionRank, b: RegionRank) => b.count - a.count)
         .slice(0, 10);
 
@@ -541,7 +584,7 @@ export default function PublisherAdminLayout() {
     }
   };
 
-  // ✅ REAL 部署：不再用 MetaMask，直接让后端(用Redis私钥)扣费+部署
+  // ✅ REAL 部署：后端完成扣费+部署（MVP：不传 publisher 时后端用系统密钥代付）
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
       setError("请完整填写书籍名称和代码");
@@ -553,7 +596,7 @@ export default function PublisherAdminLayout() {
 
     try {
       const ok = window.confirm(
-        `部署将由后端自动完成：\n- 从出版社余额扣除 ${DEPLOY_FEE_USDT} USDT（防垃圾费）\n- 然后部署合约\n\n继续？\n收款地址：${TREASURY_ADDRESS}`
+        `部署将由后端自动完成。\n\n继续？`
       );
       if (!ok) {
         showToast("已取消部署", "error");
@@ -561,10 +604,6 @@ export default function PublisherAdminLayout() {
       }
 
       const publisher = (pubAddress || "").trim();
-      if (!isHexAddress(publisher)) {
-        throw new Error(`publisher 地址无效（需要 0x + 40 位十六进制）：${publisher || "(empty)"}`);
-      }
-
       const url = `${origin()}/api/v1/publisher/deploy-book`;
       const result = await fetchJsonOrThrow<any>(url, {
         method: "POST",
@@ -574,7 +613,7 @@ export default function PublisherAdminLayout() {
           symbol: symbol.toUpperCase(),
           author: author || "未知作者",
           serial: serial || `SERIAL${Date.now()}`,
-          publisher,
+          publisher: isHexAddress(publisher) ? publisher : "",
         }),
       });
 
@@ -587,7 +626,7 @@ export default function PublisherAdminLayout() {
       await refreshAfterTopup({ symbol: "USDT", address: USDT_ADDRESS });
 
       const txHash = result.txHash || "";
-      const explorerTx = txHash ? `https://evmtestnet.confluxscan.io/tx/${txHash}` : "#";
+      const explorerTx = txHash ? `${EXPLORER_URL}/tx/${txHash}` : "#";
 
       const newBook: BookSales = {
         address: result.bookAddr || "(pending)",
@@ -596,6 +635,7 @@ export default function PublisherAdminLayout() {
         author: author || "未知作者",
         sales: 0,
         explorerUrl: explorerTx,
+        deployer: (pubAddress || "").trim() || undefined,
       };
 
       const nextBooks = [newBook, ...loadBooksFromStorage()];
@@ -713,6 +753,10 @@ export default function PublisherAdminLayout() {
     count,
     setCount,
 
+    bookListForDropdown,
+    bookListLoading,
+    fetchBookListForDropdown,
+
     bookQuery,
     setBookQuery,
     bookCandidates,
@@ -732,32 +776,32 @@ export default function PublisherAdminLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-800">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 text-sm">{envMode === "mock" ? "加载 Mock 数据..." : "连接后端 API..."}</p>
+          <p className="text-slate-600 text-sm">{envMode === "mock" ? "加载 Mock 数据..." : "连接后端 API..."}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 font-sans text-slate-800">
       <ToastContainer />
 
-      <header className="bg-card/95 backdrop-blur-lg border-b border-border sticky top-0 z-10 px-6 py-4">
+      <header className="bg-white/95 backdrop-blur-lg border-b border-slate-200 sticky top-0 z-10 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-6">
             <div>
-              <h1 className="text-xl font-serif font-black text-primary">
-                Anti-counterfeit · Publisher Admin
+              <h1 className="text-xl font-serif font-black text-slate-900">
+                商家后台管理系统
               </h1>
 
               {/* ✅ Hackathon: 隐藏 Mock/Real 切换按钮（仍强制 REAL） */}
               {null}
 
               <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-400 font-mono">
+                <p className="text-xs text-slate-600 font-mono">
                   {(pubAddress || "").slice(0, 6)}...{(pubAddress || "").slice(-4)}
                 </p>
                 <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
@@ -767,7 +811,7 @@ export default function PublisherAdminLayout() {
 
               {/* ✅ 明示费用提示（防垃圾费） */}
               {envMode === "real" ? (
-                <div className="mt-1 text-[11px] text-slate-500">
+                <div className="mt-1 text-[11px] text-slate-600">
                   Deployment is done by the backend and <b>{DEPLOY_FEE_USDT} USDT</b> will be deducted (anti-spam fee) → Treasury{" "}
                   {shortenAddress(TREASURY_ADDRESS)}
                 </div>
@@ -812,34 +856,34 @@ export default function PublisherAdminLayout() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+            <div className="flex gap-1 bg-slate-200 p-1 rounded-lg">
               <button
                 onClick={() => navigate("/publisher-admin/overview")}
-                className="px-3 py-2 text-xs font-medium rounded-md hover:bg-white"
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
-                📊 销量总览
+                📊 查看销量
               </button>
               <button
                 onClick={() => navigate("/publisher-admin/add-book")}
-                className="px-3 py-2 text-xs font-medium rounded-md hover:bg-white"
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
-                📚 新增图书
+                📚 部署商品
               </button>
               <button
                 onClick={() => navigate("/publisher-admin/qrcode")}
-                className="px-3 py-2 text-xs font-medium rounded-md hover:bg-white"
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
                 🔗 生成二维码
               </button>
               <button
                 onClick={() => navigate("/publisher-admin/analytics")}
-                className="px-3 py-2 text-xs font-medium rounded-md hover:bg-white"
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
                 🗺️ 热力分析
               </button>
               <button
                 onClick={() => navigate("/publisher-admin/topup")}
-                className="px-3 py-2 text-xs font-medium rounded-md hover:bg-white"
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
                 💳 多资产充值
               </button>
@@ -855,7 +899,7 @@ export default function PublisherAdminLayout() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6">
+      <main className="max-w-7xl mx-auto p-6 text-slate-800">
         <Outlet context={ctx} />
       </main>
     </div>

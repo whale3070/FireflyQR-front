@@ -5,6 +5,9 @@ set -euo pipefail
 # Whale Vault Frontend Deploy
 # =========================
 
+# 限制 Node 内存，防止 npm install / npm run build 吃满内存导致服务器卡死
+export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=1024"
+
 # 1) 项目路径（你现在的真实路径）
 SOURCE_DIR="/root/git-connect-helper-edbe1c7c"
 DIST_DIR="$SOURCE_DIR/dist"
@@ -19,6 +22,7 @@ echo "🚀 [Whale3070] 开始部署..."
 echo "   - SOURCE_DIR: $SOURCE_DIR"
 echo "   - DIST_DIR:   $DIST_DIR"
 echo "   - WEB_ROOT:   $WEB_ROOT"
+echo "   - NODE_OPTIONS: $NODE_OPTIONS (限制 Node 内存防卡死)"
 
 # 0. 前置检查
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -28,17 +32,19 @@ fi
 
 cd "$SOURCE_DIR"
 
-# 1. 前端编译 🔥【这里已加内存限制，不会卡死】
+# 1. 前端编译（整脚本已 export NODE_OPTIONS，npm 与 build 共用 1GB 上限）
 echo "📦 正在执行前端构建..."
-# 优先保证 node_modules 正确（可根据你习惯改为 npm install）
+FREE_MB=$(awk '/MemAvailable/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo "0")
+if [ "$FREE_MB" -lt 800 ] 2>/dev/null; then
+  echo "⚠️ 当前可用内存约 ${FREE_MB}MB，建议至少 800MB 可用或增加 swap，否则可能卡死。"
+fi
 if [ -f "package-lock.json" ]; then
   npm ci
 else
   npm install
 fi
 
-# 🔴 修复：限制 Node 内存为 1GB，防止服务器卡死
-NODE_OPTIONS="--max-old-space-size=1024" npm run build
+npm run build
 
 # 2. 检查 dist 是否生成
 if [ ! -d "$DIST_DIR" ]; then
@@ -99,6 +105,7 @@ echo "✅ 部署成功！"
 echo "   - 线上目录：$WEB_ROOT"
 echo "   - 备份目录：${BACKUP_DIR:-无}"
 echo "🎉 部署闭环完成。"
-cp /root/faucethub/server/conflux-faucet-plugin.js /var/www/static/
-cp /root/git-connect-helper-edbe1c7c/public/whale-vault-pitch-deck.mp4 /var/www/whale-vault/assets
-cp /root/git-connect-helper-edbe1c7c/public/pitch-deck.html /var/www/whale-vault/
+# 以下复制若路径不存在会跳过，避免因权限/路径导致脚本报错
+cp /root/faucethub/server/conflux-faucet-plugin.js /var/www/static/ 2>/dev/null || true
+cp "$SOURCE_DIR/public/whale-vault-pitch-deck.mp4" "$WEB_ROOT/assets" 2>/dev/null || true
+cp "$SOURCE_DIR/public/pitch-deck.html" "$WEB_ROOT/" 2>/dev/null || true

@@ -61,7 +61,7 @@ export default function OverviewPage() {
       // 兜底清洗
       const cleaned = (items || [])
         .map((it) => ({
-          name: String(it?.name ?? "Unknown"),
+          name: (it?.name === "Unknown" || !it?.name) ? "未知" : String(it.name),
           count: Number(it?.count ?? 0),
           lng: it?.lng,
           lat: it?.lat,
@@ -112,7 +112,7 @@ export default function OverviewPage() {
     if (envMode === "real") return liveLeaderboard;
     // 兼容 regionRanks 可能是 {region,count}
     return (regionRanks || []).map((r: any) => ({
-      name: r.region ?? r.name ?? "Unknown",
+      name: (r.region ?? r.name) === "Unknown" || !(r.region ?? r.name) ? "未知" : String(r.region ?? r.name),
       count: Number(r.count ?? 0),
     })) as LeaderboardItem[];
   }, [envMode, liveLeaderboard, regionRanks]);
@@ -150,45 +150,45 @@ export default function OverviewPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
-          <p className="text-indigo-600 text-xs uppercase font-semibold mb-1">Gross Sales</p>
-          <p className="text-4xl font-black text-slate-800">{totalSales.toLocaleString()}</p>
-          <p className="mt-2 text-xs text-slate-500">出版社口径（业务销量总计）</p>
+        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
+          <p className="text-indigo-700 text-xs uppercase font-semibold mb-1">Gross Sales</p>
+          <p className="text-4xl font-black text-slate-900">{totalSales.toLocaleString()}</p>
+          <p className="mt-2 text-xs text-slate-600">商家口径（业务销量总计）</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
-          <p className="text-teal-600 text-xs uppercase font-semibold mb-1">Titles Live</p>
-          <p className="text-4xl font-black text-slate-800">{bookSales.length}</p>
-          <p className="mt-2 text-xs text-slate-500">已上链 / 已上架的图书合约</p>
+        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
+          <p className="text-teal-700 text-xs uppercase font-semibold mb-1">Titles Live</p>
+          <p className="text-4xl font-black text-slate-900">{bookSales.length}</p>
+          <p className="mt-2 text-xs text-slate-600">已上链 / 已上架的商品合约</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
-          <p className="text-emerald-600 text-xs uppercase font-semibold mb-1">On-chain Verified Mints</p>
-          <p className="text-4xl font-black text-slate-800">
+        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
+          <p className="text-emerald-700 text-xs uppercase font-semibold mb-1">On-chain Verified Mints</p>
+          <p className="text-4xl font-black text-slate-900">
             {envMode === "real" ? totals.mintedTotal.toLocaleString() : "—"}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-slate-600">
             {envMode === "real"
               ? `实时扫描到区块 #${totals.lastScannedBlock.toLocaleString()}`
               : "切换到 Live Data 查看链上统计"}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
-          <p className="text-purple-600 text-xs uppercase font-semibold mb-1">Unique Real Readers</p>
-          <p className="text-4xl font-black text-slate-800">
+        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
+          <p className="text-purple-700 text-xs uppercase font-semibold mb-1">Unique Real Readers</p>
+          <p className="text-4xl font-black text-slate-900">
             {envMode === "real" ? totals.uniqueRealUsers.toLocaleString() : "—"}
           </p>
-          <p className="mt-2 text-xs text-slate-500">反刷量口径：一码一人（可审计）</p>
+          <p className="mt-2 text-xs text-slate-600">反刷量口径：一码一人（可审计）</p>
         </div>
       </div>
 
       {/* ✅ 地区销量/点亮排名 */}
-      <div className="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-sm font-bold text-slate-800">🌍 销量地区排名（City 级）</h2>
+      <div className="bg-white rounded-2xl shadow-soft border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <h2 className="text-sm font-bold text-slate-900">🌍 销量地区排名（City 级）</h2>
           <div className="flex items-center gap-2">
             {envMode === "real" && (
               <button
@@ -210,7 +210,7 @@ export default function OverviewPage() {
 
         <div className="px-6 py-4">
           {envMode === "real" && lbLoading && (
-            <div className="text-xs text-slate-500">正在拉取地区榜单…</div>
+            <div className="text-xs text-slate-600">正在拉取地区榜单…</div>
           )}
           {envMode === "real" && lbErr && (
             <div className="text-xs text-red-600">
@@ -219,17 +219,17 @@ export default function OverviewPage() {
           )}
 
           {displayRanks.length === 0 ? (
-            <div className="text-xs text-slate-500">暂无数据（先 mint 几次产生城市聚合）</div>
+            <div className="text-xs text-slate-600">暂无数据（先 mint 几次产生城市聚合）</div>
           ) : (
             <table className="w-full">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">排名</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">城市</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">销量/点亮数</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">排名</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">城市</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">销量/点亮数</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {displayRanks
                   .slice()
                   .sort((a, b) => b.count - a.count)
@@ -240,19 +240,19 @@ export default function OverviewPage() {
                         <span
                           className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                             idx === 0
-                              ? "bg-amber-100 text-amber-700"
+                              ? "bg-amber-100 text-amber-800"
                               : idx === 1
-                              ? "bg-slate-200 text-slate-600"
+                              ? "bg-slate-200 text-slate-700"
                               : idx === 2
-                              ? "bg-orange-100 text-orange-700"
-                              : "bg-slate-100 text-slate-500"
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-slate-100 text-slate-700"
                           }`}
                         >
                           {idx + 1}
                         </span>
                       </td>
-                      <td className="px-4 py-4 text-slate-800 font-medium">{it.name}</td>
-                      <td className="px-4 py-4 text-right font-mono text-lg text-emerald-600 font-bold">
+                      <td className="px-4 py-4 text-slate-900 font-medium">{it.name}</td>
+                      <td className="px-4 py-4 text-right font-mono text-lg text-emerald-700 font-bold">
                         {Number(it.count || 0).toLocaleString()}
                       </td>
                     </tr>
@@ -263,10 +263,10 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* 图书销量排行（原有） */}
-      <div className="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-sm font-bold text-slate-800">📖 图书销量排行（点击行查看子合约与链上领取记录）</h2>
+      {/* 商品销量排行（原有） */}
+      <div className="bg-white rounded-2xl shadow-soft border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <h2 className="text-sm font-bold text-slate-900">📖 商品销量排行（点击行查看子合约与链上领取记录）</h2>
           <div className="flex items-center gap-2">
             {envMode === "real" && (
               <button
@@ -287,18 +287,17 @@ export default function OverviewPage() {
         </div>
 
         <table className="w-full">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-100">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">排名</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">代码</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">书名</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">作者</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">销量</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">链上 Mint</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">真实读者</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">排名</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">代码</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">商品 SKU</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">部署者</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">链上 Mint</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">真实读者</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-200">
             {bookSales.map((book, idx) => (
               <tr
                 key={book.address}
@@ -309,27 +308,24 @@ export default function OverviewPage() {
                   <span
                     className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                       idx === 0
-                        ? "bg-amber-100 text-amber-700"
+                        ? "bg-amber-100 text-amber-800"
                         : idx === 1
-                        ? "bg-slate-200 text-slate-600"
+                        ? "bg-slate-200 text-slate-700"
                         : idx === 2
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-slate-100 text-slate-500"
+                        ? "bg-orange-100 text-orange-800"
+                        : "bg-slate-100 text-slate-700"
                     }`}
                   >
                     {idx + 1}
                   </span>
                 </td>
-                <td className="px-4 py-4 font-mono text-indigo-600 text-sm font-medium">{book.symbol}</td>
-                <td className="px-4 py-4 text-slate-800 font-medium">{book.name}</td>
-                <td className="px-4 py-4 text-slate-500">{book.author}</td>
-                <td className="px-4 py-4 text-right font-mono text-lg text-emerald-600 font-bold">
-                  {book.sales.toLocaleString()}
-                </td>
-                <td className="px-4 py-4 text-right font-mono text-lg text-slate-800 font-bold">
+                <td className="px-4 py-4 font-mono text-indigo-700 text-sm font-medium">{book.symbol}</td>
+                <td className="px-4 py-4 font-mono text-slate-900 text-sm break-all">{book.address || "—"}</td>
+                <td className="px-4 py-4 font-mono text-slate-700 text-xs break-all">{book.deployer || "—"}</td>
+                <td className="px-4 py-4 text-right font-mono text-lg text-slate-900 font-bold">
                   {envMode === "real" ? (nftStatsMap?.[(book.address || "").toLowerCase()]?.minted_total ?? "—") : "—"}
                 </td>
-                <td className="px-4 py-4 text-right font-mono text-lg text-purple-700 font-bold">
+                <td className="px-4 py-4 text-right font-mono text-lg text-purple-800 font-bold">
                   {envMode === "real" ? (nftStatsMap?.[(book.address || "").toLowerCase()]?.unique_real_users ?? "—") : "—"}
                 </td>
               </tr>
@@ -348,22 +344,22 @@ export default function OverviewPage() {
             className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-800">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-900">
                 📖 {detailBook.name}（{detailBook.symbol}）
               </h2>
               <button
                 type="button"
-                className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
+                className="text-slate-500 hover:text-slate-700 text-2xl leading-none"
                 onClick={() => setDetailBook(null)}
               >
                 ×
               </button>
             </div>
-            <div className="px-6 py-4 border-b border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 uppercase mb-1">子合约链上地址</p>
+            <div className="px-6 py-4 border-b border-slate-200">
+              <p className="text-xs font-semibold text-slate-600 uppercase mb-1">子合约链上地址</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <code className="font-mono text-sm text-indigo-600 bg-slate-50 px-2 py-1 rounded break-all">
+                <code className="font-mono text-sm text-indigo-700 bg-slate-100 px-2 py-1 rounded break-all">
                   {detailBook.address}
                 </code>
                 <button
@@ -384,22 +380,22 @@ export default function OverviewPage() {
               </div>
             </div>
             <div className="px-6 py-4 flex-1 overflow-auto">
-              <p className="text-xs font-semibold text-slate-500 uppercase mb-2">链上领取 NFT 记录</p>
+              <p className="text-xs font-semibold text-slate-600 uppercase mb-2">链上领取 NFT 记录</p>
               {detailMintsLoading ? (
-                <p className="text-sm text-slate-500">加载中…</p>
+                <p className="text-sm text-slate-600">加载中…</p>
               ) : detailMints.length === 0 ? (
-                <p className="text-sm text-slate-500">暂无记录（仅包含本系统处理过的 mint 交易）</p>
+                <p className="text-sm text-slate-600">暂无记录（仅包含本系统处理过的 mint 交易）</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 sticky top-0">
+                  <thead className="bg-slate-100 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">领取地址</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Token ID</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">交易哈希</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">时间</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">领取地址</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">Token ID</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">交易哈希</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">时间</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-200">
                     {detailMints.map((m, i) => (
                       <tr key={`${m.tx_hash ?? i}-${i}`} className="hover:bg-slate-50">
                         <td className="px-3 py-2 font-mono text-xs text-slate-700 truncate max-w-[120px]" title={m.reader ?? ""}>
@@ -412,7 +408,7 @@ export default function OverviewPage() {
                               href={`${EXPLORER_URL}/tx/${m.tx_hash}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-mono text-xs text-indigo-600 hover:underline truncate max-w-[140px] inline-block"
+                              className="font-mono text-xs text-indigo-700 hover:underline truncate max-w-[140px] inline-block"
                               title={m.tx_hash}
                             >
                               {m.tx_hash.slice(0, 10)}…{m.tx_hash.slice(-8)}
@@ -421,7 +417,7 @@ export default function OverviewPage() {
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right text-slate-500 text-xs">
+                        <td className="px-3 py-2 text-right text-slate-600 text-xs">
                           {m.minted_at
                             ? new Date((m.minted_at as number) * 1000).toLocaleString()
                             : "—"}

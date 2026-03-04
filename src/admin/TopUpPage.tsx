@@ -173,18 +173,20 @@ async function inferTokenAddressFromReceipt(rpcUrl: string, txHash: string, publ
 }
 
 async function readErc20MetaAndBalance(rpcUrl: string, tokenAddr: string, owner: string) {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const c = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
-
-  const [raw, decimals, symbol] = await Promise.all([
-    c.balanceOf(owner),
-    c.decimals(),
-    c.symbol().catch(() => "TOKEN"),
-  ]);
-
-  const dec = Number(decimals);
-  const bal = ethers.formatUnits(raw, dec);
-  return { symbol: String(symbol || "TOKEN"), decimals: dec, balance: bal };
+  try {
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const c = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+    const [raw, decimals, symbol] = await Promise.all([
+      c.balanceOf(owner),
+      c.decimals(),
+      c.symbol().catch(() => "TOKEN"),
+    ]);
+    const dec = Number(decimals);
+    const bal = ethers.formatUnits(raw, dec);
+    return { symbol: String(symbol || "TOKEN"), decimals: dec, balance: bal };
+  } catch {
+    return { symbol: "—", decimals: 18, balance: "0" };
+  }
 }
 
 /** ========= page ========= **/
@@ -394,7 +396,7 @@ export default function TopUpPage() {
     <div style={{ padding: 24, maxWidth: 980 }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>多资产充值入口（PoC）</h1>
       <p style={{ marginTop: 0, color: "#666", lineHeight: 1.5 }}>
-        目的：让出版社/合作方可以用 <b>XMR / BTC / ETH / USDT / 法币</b> 充值进入系统。系统内部以 <b>CFX</b>{" "}
+        目的：让商家/合作方可以用 <b>XMR / BTC / ETH / USDT / 法币</b> 充值进入系统。系统内部以 <b>CFX</b>{" "}
         作为结算单位，用于代付 gas 与链上交互。
         <br />
         <span style={{ fontSize: 12 }}>
@@ -643,7 +645,7 @@ export default function TopUpPage() {
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.7 }}>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>落地路线（答辩口径）</div>
             <ol style={{ marginTop: 0, paddingLeft: 18 }}>
-              <li>出版社/合作方无需持有 CFX；只需选择资产充值。</li>
+              <li>商家/合作方无需持有 CFX；只需选择资产充值。</li>
               <li>系统侧监听入账（链上/支付回调），折算为内部 CFX 余额。</li>
               <li>读者扫码时使用 EIP-7702 + 代付，让 0 CFX 用户完成交互。</li>
               <li>系统消耗 CFX 支付 gas，并记录每笔成本与账单。</li>

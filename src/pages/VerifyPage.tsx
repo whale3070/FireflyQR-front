@@ -14,7 +14,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const { hash } = useParams<{ hash: string }>();
   const [searchParams] = useSearchParams();
   const { isMockMode } = useAppMode();
-  const { verifyCode, getBinding } = useApi();
+  const { verifyCode, getBinding, getScanInfo } = useApi();
 
   // ✅ 不要把 hash 固定进 useState（路由变化时会不同步）
   const codeHash = useMemo(() => (hash || '').trim(), [hash]);
@@ -34,6 +34,14 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const [role, setRole] = useState<'publisher' | 'author' | 'reader' | null>(null);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [invalidCode, setInvalidCode] = useState(false);
+  /** 此码已领取过：直接在本页展示“已领取”界面，不进入领取流程 */
+  const [alreadyClaimed, setAlreadyClaimed] = useState(false);
+  const [alreadyClaimedScanInfo, setAlreadyClaimedScanInfo] = useState<{
+    first_scan_time: string;
+    location: string;
+    sku: string;
+    reward_amount?: number;
+  } | null>(null);
 
   /**
    * ✅ 修复“必须切 mock 再切回来才自动填充”的根因：
@@ -48,6 +56,8 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
       setLoading(true);
       setError('');
       setInvalidCode(false);
+      setAlreadyClaimed(false);
+      setAlreadyClaimedScanInfo(null);
       setRole(null);
 
       if (!codeHash) {
@@ -119,6 +129,29 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
               return;
             }
 
+            // 一码一领：该码已领取过，直接在本页展示“此码已经领取过”界面（不进入领取流程、不跳转）
+            if (bindResult.status === 'used') {
+              setAlreadyClaimed(true);
+              setRole('reader');
+              setLoading(false);
+              try {
+                const scanRes: any = await getScanInfo(codeHash);
+                if (scanRes?.ok && scanRes?.data) {
+                  const d = scanRes.data;
+                  const loc = (d.location || '').split('|')[0] || d.location || '';
+                  setAlreadyClaimedScanInfo({
+                    first_scan_time: d.first_scan_time ?? '',
+                    location: loc,
+                    sku: d.sku ?? '',
+                    reward_amount: d.reward_amount,
+                  });
+                }
+              } catch (_) {
+                setAlreadyClaimedScanInfo({ first_scan_time: '', location: '', sku: '', reward_amount: undefined });
+              }
+              return;
+            }
+
             if (bindResult.address) setTargetAddress(String(bindResult.address).trim());
 
             // 优先用后端返回的 book_address；否则用 URL 兜底
@@ -147,7 +180,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     return () => {
       cancelled = true;
     };
-  }, [codeHash, verifyCode, getBinding, contractFromUrl, isMockMode]);
+  }, [codeHash, verifyCode, getBinding, getScanInfo, contractFromUrl, bookIdFromUrl, isMockMode]);
 
   const confirmAndGoToMint = () => {
     const params = new URLSearchParams();
@@ -171,6 +204,40 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
 
     navigate(`/mint/${codeHash}?${params.toString()}`);
   };
+
+  // 此码已经领取过：直接展示“已领取”界面，不显示领取 NFT
+  if (alreadyClaimed) {
+    const info = alreadyClaimedScanInfo;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-white border border-slate-200 rounded-3xl p-8 text-center space-y-6 shadow-lg">
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto border border-amber-100">
+            <span className="text-amber-600 text-4xl">✓</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-800">此码已经领取过</h1>
+          <p className="text-sm text-slate-500">该二维码已领取过 NFT，仅可查看当时的扫码信息。</p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left space-y-2">
+            <p className="text-xs text-slate-500 font-medium">领取红包时间</p>
+            <p className="text-sm text-slate-800">{info?.first_scan_time || '—'}</p>
+            <p className="text-xs text-slate-500 font-medium mt-3">城市</p>
+            <p className="text-sm text-slate-800">{info?.location || '—'}</p>
+            <p className="text-xs text-slate-500 font-medium mt-3">红包金额</p>
+            <p className="text-sm text-slate-800">
+              {info?.reward_amount != null ? `${Number(info.reward_amount).toFixed(2)} 元` : '—'}
+            </p>
+            <p className="text-xs text-slate-500 font-medium mt-3">商品 SKU</p>
+            <p className="text-sm font-mono text-slate-800 break-all">{info?.sku || '—'}</p>
+          </div>
+          <button
+            onClick={() => navigate('/bookshelf', { replace: true })}
+            className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all"
+          >
+            返回
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (invalidCode) {
     return (
@@ -229,7 +296,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const getRoleStyle = () => {
     switch (role) {
       case 'publisher':
-        return { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', label: '出版社' };
+        return { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', label: '商家' };
       case 'author':
         return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', label: '作者' };
       case 'reader':
@@ -301,7 +368,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
             >
               <p className={`text-sm ${role === 'publisher' ? 'text-purple-700' : 'text-orange-700'}`}>
                 {role === 'publisher'
-                  ? '📚 出版社管理后台：查看销量、部署新书、生成二维码、热力分析'
+                  ? '📚 商家后台管理系统：查看销量、部署商品、生成二维码、热力分析'
                   : '✍️ 作者后台：查看作品销量和读者分布'}
               </p>
             </div>
@@ -329,7 +396,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
                   : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
               }`}
             >
-              进入{role === 'publisher' ? '出版社' : '作者'}后台
+              进入{role === 'publisher' ? '商家' : '作者'}后台
             </button>
           </div>
         )}

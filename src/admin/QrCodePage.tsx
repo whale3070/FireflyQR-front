@@ -9,11 +9,11 @@ export default function QrCodePage() {
     contractAddr,
     setContractAddr,
 
-    // real search
-    bookQuery,
-    setBookQuery,
-    bookCandidates,
-    bookSearchLoading,
+    // 下拉框列表（real 模式）
+    bookListForDropdown,
+    bookListLoading,
+    fetchBookListForDropdown,
+
     selectedBook,
     setSelectedBook,
     shortenAddress,
@@ -54,63 +54,50 @@ export default function QrCodePage() {
                 ))}
               </select>
             ) : (
-              <div className="space-y-3">
-                <input
-                  value={bookQuery}
-                  onChange={(e) => setBookQuery(e.target.value)}
-                  placeholder="输入书名 / 作者 / 代码 / serial（至少2个字符）"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400"
-                />
-
-                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                  <div className="px-4 py-2 text-xs text-slate-500 flex items-center justify-between">
-                    <span>候选列表（最多 20 条）</span>
-                    <span>
-                      {bookSearchLoading
-                        ? "搜索中..."
-                        : bookQuery.trim().length < 2
-                        ? "输入 2 个字符开始搜索"
-                        : `${bookCandidates.length} 条`}
-                    </span>
-                  </div>
-
-                  {bookCandidates.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-slate-400">
-                      {bookQuery.trim().length < 2 ? "请输入关键词开始搜索" : "没有匹配结果"}
-                    </div>
-                  ) : (
-                    <div className="max-h-64 overflow-auto">
-                      {bookCandidates.map((b, idx) => {
-                        const addr = (b.bookAddr || b.address || "").toString();
-                        const title = b.name || "未命名";
-                        const au = b.author || "未知作者";
-                        const sym = (b.symbol || "").toString();
-                        const ser = (b.serial || "").toString();
-
-                        return (
-                          <button
-                            key={addr || idx}
-                            type="button"
-                            className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 border-t border-slate-100"
-                            onClick={() => {
-                              setContractAddr(addr);
-                              setSelectedBook(b);
-                            }}
-                          >
-                            <div className="font-semibold text-slate-800">
-                              《{title}》 - {au}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-1">
-                              {sym} / {ser}{" "}
-                              <span className="ml-2">{shortenAddress(addr)}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                    value={contractAddr || ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setContractAddr(v || null);
+                      const item = bookListForDropdown.find((b) => (b.bookAddr || "").toLowerCase() === (v || "").toLowerCase());
+                      setSelectedBook(item || null);
+                    }}
+                    disabled={bookListLoading}
+                  >
+                    <option value="">-- 选择已部署的书籍合约 --</option>
+                    {bookListForDropdown.map((b) => {
+                      const addr = (b.bookAddr || "").toString();
+                      const label = [b.symbol, b.name].filter(Boolean).join(" - ") || shortenAddress(addr);
+                      return (
+                        <option key={addr} value={addr}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchBookListForDropdown}
+                    disabled={bookListLoading}
+                    className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 disabled:opacity-50"
+                    title="刷新列表"
+                  >
+                    {bookListLoading ? (
+                      <span className="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
-
+                {bookListLoading && <p className="text-xs text-slate-500">加载书籍列表中...</p>}
+                {!bookListLoading && bookListForDropdown.length === 0 && (
+                  <p className="text-sm text-slate-500">暂无已部署的商品，请先在「部署商品」中部署</p>
+                )}
                 {selectedBook && contractAddr ? (
                   <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold">
                     已选择：《{selectedBook.name || "未命名"}》 (

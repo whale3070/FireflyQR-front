@@ -1,7 +1,7 @@
-// Conflux eSpace Testnet 配置
-export const CHAIN_ID = 71
-export const RPC_URL = 'https://evmtestnet.confluxrpc.com'
-export const EXPLORER_URL = 'https://evmtestnet.confluxscan.io'
+// Avalanche Fuji C-Chain 配置（与后端 .env RPC_URL 一致）
+export const CHAIN_ID = 43113
+export const RPC_URL = 'https://api.avax-test.network/ext/bc/C/rpc'
+export const EXPLORER_URL = 'https://testnet.snowtrace.io'
 export const TREASURY_ADDRESS = "0x5E8de2503881a49ed4db721E4fbAfc106C3782E6";
 export const DEPLOY_FEE_USDT = 10; // 人类单位
 // BookFactory 合约地址 (已部署)
