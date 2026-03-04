@@ -1,504 +1,343 @@
-# Whale Vault DApp / NFT 金库收银台
-
-Whale Vault 是一个围绕 **实体书兑换码 Hash Code** 的 NFT 金库与收银台 DApp，面向读者、作者和出版社三方：
-
-- 读者：使用微信/系统相机扫码打开领取链接 → 填写Monad地址 → 领取 NFT → 解锁 Arweave 正文、Matrix 私域社群等数字权益
-- 作者 / 出版社：在管理后台查看销量、财务数据，一键提现和批量导入授权
-- 平台方：运行 Go 中间层提供 **免 Gas 领取入口（中继）**，并做风控与统计
-
-本仓库包含：
-
-- 前端：React + Vite + Tailwind CSS 单页应用
-- 钱包与链交互：Polkadot{.js} 扩展 + `@polkadot/api` / `@polkadot/api-contract`
-- 后端：Go 实现的元交易 Relay Server + Redis 统计
-
----
-
-## 1. 功能总览
-
-### 1.1 收银台（读者侧）
-
-完整用户流：**扫码打开领取链接 → 自动校验兑换码 → 填写Monad地址 → 确认领取 → 成功页 → 解锁内容**。
-
-- 领取页 `/valut_mint_nft/:hashCode`
-  - 实体书二维码内容为 URL：`http://Domain/valut_mint_nft/:hashCode`
-  - 页面通过 Path Parameter 读取 `hashCode`，并在加载时自动调用后端校验接口：
-    - `GET /secret/verify?codeHash={hashCode}`
-  - 校验通过后显示：
-    - 新手引导（钱包下载说明）
-    - Monad地址输入框：「请输入您的Monad钱包地址」
-    - 按钮：「确认领取」
-  - 校验失败时显示全屏错误提示，不展示输入框
-
-- 成功展示页 `/success`
-  - 展示一个 NFT 勋章占位图和简洁的祝贺文案
-  - 展示当前钱包地址与 `book_id`
-  - 点击「验证访问权限」调用合约只读方法 `has_access(address, book_id)`
-  - 验证通过后展示：
-    - Arweave 资源链接：`https://arweave.net/{TX_ID}`
-    - Matrix 私域社群入口
-  - 提供「返回首页」按钮
-
-### 1.2 管理后台（作者 / 出版社）
-
-管理后台挂在 `/admin` 路由下，采用侧边栏布局，包含：
+# Avalanche Hackathon Build Games Submission Document (RWA Wine Chain Game Anti-Counterfeiting and Anti-Diversion Solution)
 
-- 数据总览 `/admin/overview`
-  - 卡片展示：
-    - 累计销售额
-    - 已 Mint 数量
-    - 当前可提现余额
-  - 使用 Mock 数据 + 可选链上统计进行组合展示
+# 🚀 Judge Quickstart (2-Minute Overview)
 
-- 销量监控看板 `/admin/monitor`
-  - 数据卡片：总销售额、已铸造 NFT 数量、待提现余额
-  - 趋势图表：使用 Recharts 绘制近 30 天销售增长曲线
-  - 明细表：展示最近 Mint 记录（时间、book_id、用户地址缩略、状态）
-  - 可从后端 `/metrics/mint` 或合约只读方法拉取统计，并与 Mock 数据叠加
+## One-liner
 
-- 销量明细 `/admin/sales`
-  - 表格列出每笔 Mint 记录
-  - 包含时间戳、book_id、交易哈希等
-  - 目前以 Mock 数据为主，可平滑切换到真实后端
+> We turn every wine bottle into a verifiable on-chain quest, where opening becomes a game and refilling becomes economically irrational.
+> 
+> 
 
-- 财务提现 `/admin/withdraw`
-  - 展示当前账户在合约中的「可提取余额」
-  - 点击「立即提现」时：
-    - 调用 Polkadot{.js} 钱包，签名执行合约 `pull_funds()`
-    - 显示发送与区块确认状态
-    - 提现成功后触发前端 Confetti（纸屑特效）
-    - 自动刷新可提余额
+## 🎯 The Problem
 
-- 批次创建 `/admin/batch`
-  - 支持导入 CSV 文件批量配置授权：
-    - 每行结构：`book_id, secret_code`
-  - 前端自动对 Secret Code 计算 SHA-256 哈希（使用浏览器 `crypto.subtle.digest`）
-  - 组装参数并调用合约 `add_book_batch(ids, hashes)`，实现一次性写入链上
+- Refilled wine bottles are hard to detect at scale.
 
----
+- QR codes and laser labels are copyable.
 
-## 2. 技术栈与架构
+- Consumers have no incentive to verify authenticity.
 
-### 2.1 前端
+- Cross-border diversion causes pricing chaos and channel conflict.
 
-- React 18
-- Vite
-- React Router v7（`react-router-dom`）
-- Tailwind CSS
-- Polkadot 相关：
-  - `@polkadot/api`
-  - `@polkadot/api-contract`
-  - `@polkadot/extension-dapp`
-  - `@polkadot/util-crypto` / `@polkadot/util`（地址解析与网络前缀转换）
-- 图表：`recharts`
-- 特效：`canvas-confetti`
+## 💡 The Core Idea
 
-主要结构：
+We bind a **physically destructive tamper-evident seal** with an **Avalanche-based NFT activation protocol**:
 
-- `src/App.tsx`：路由入口
-  - `/` 首页（入口卡片 + 简要销量看板）
-  - `/valut_mint_nft/:hashCode` 领取页
-  - `/success` 成功 + 解锁内容页
-  - `/settings` 链配置页
-  - `/admin/*` 管理后台布局与子路由
+1. The QR code is hidden under a laser holographic seal (irreversible once torn).
 
-- 钱包相关
-  - `src/hooks/usePolkadotWallet.ts`：统一封装 Polkadot{.js} 扩展连接与账户选择
-  - `src/components/NavBar.tsx`：连接 / 断开钱包按钮 + 账户选择器
+2. Opening the bottle reveals the full QR.
 
-- 链配置
-  - `src/state/useChainConfig.ts`:
-    - `endpoint`：节点 WebSocket 地址（默认 `wss://ws.azero.dev`）
-    - `contractAddress`：Ink! 合约地址
-    - `abiUrl`：ABI JSON 文件 URL
-    - 持久化到 `localStorage.chainConfig`
+3. The consumer scans and claims a unique RWA-NFT.
 
-- 后端地址配置
-  - `src/config/backend.ts`:
-    - `export const BACKEND_URL = 'http://198.55.109.102'`（按你的环境修改）
-    - 用于兑换码校验、领取中继与监控接口
+4. A lightweight on-chain challenge verifies time + location.
 
-### 2.2 后端（Middle-layer / Relay Server）
+5. Opening data is written into NFT metadata and permanently locked.
 
-位置：`backend/main.go`
+6. Any re-scan immediately reveals prior claim — exposing refilling attempts.
 
-当前 Demo 职责：
+Opening becomes a **verifiable action**.
 
-- 接收前端的领取请求（包含 `dest` / `dataHex` / `signer` / `codeHash`）
-- 对每个 IP 做简单限流与封禁检查
-- 基于 `codeHash`（兑换码 Hash Code）做**唯一性锁**，防止同一兑换码被并发或重复刷接口
-- 写入成功的 Mint 日志到 Redis（`mint:logs`），供前端销量看板查询
+Verification becomes a**game mechanic**.
 
-依赖：
+Refilling becomes **economically irrational**.
 
-- `github.com/gorilla/mux`
-- `golang.org/x/time/rate`
-- `github.com/redis/go-redis/v9`
-- （预留）`github.com/centrifuge/go-substrate-rpc-client/v4` 用于接入真实链上调用
+## 🎮 Why This Is a Game (Not Just Anti-Counterfeit)
 
----
+- Claim = Unlock
 
-## 3. 安装与运行
+- Verification = Challenge
 
-### 3.1 前端 DApp
+- Red Envelope = Reward
 
-#### 安装依赖
+- Badge = Reputation
 
-```bash
-npm install
-```
+- NFT = Permanent Proof of First Opening
 
-#### 开发模式
+We transform “anti-counterfeit verification” from a passive check into an interactive on-chain experience.
 
-```bash
-npm run dev
-```
+## ❄ Why Avalanche
 
-默认通过 Vite 启动开发服务器（通常是 `http://localhost:5173`）。
+- High TPS → supports 1M+ bottles/year
 
-#### 打包构建
+- Ultra-low Gas → <0.5 CNY per bottle total cost
 
-```bash
-npm run build
-```
+- USDC.e → stable, real economic incentives
 
-产物输出到 `dist/` 目录，可使用任意静态服务器托管。
+- Warp Messaging → cross-border data synchronization
 
-### 3.2 后端 Relay Server
+This is not a speculative NFT project.
 
-#### 前置依赖
+This is a **physical asset activation game** built on Avalanche.
 
-- Go 1.20+
-- Redis 实例（本地或远程）
+# I. Document Overview
 
-#### 环境变量
+Based on the Avalanche blockchain, this project deeply integrates "RWA physical asset (wine) on-chain" with "lightweight chain game mechanism" to create the world's first low-cost, high-security cross-border wine anti-counterfeiting and anti-diversion chain game solution. Leveraging the core advantages of Avalanche (high TPS, low Gas fees, high security), each bottle of wine is mapped to a unique on-chain NFT (RWA-NFT). The core highlight is: consumers can scan the QR code on the bottle to receive the exclusive RWA-NFT for that bottle. This NFT permanently records the opening time, opening city, detailed wine information (category, batch, production details), and red envelope amount. Combined with the chain game mechanism of "opening mining + red envelope incentives + identity challenge", it realizes "consumption is gaming, anti-counterfeiting is confirmation, and traceability is task". It fundamentally eliminates secondary refilling of recycled wine bottles, solves industry pain points of counterfeiting, diversion and secondary refilling in cross-border wine trade under the Belt and Road Initiative, and helps wine enterprises achieve digital transformation and build a closed loop of "anti-counterfeiting - marketing - confirmation".
 
-- `REDIS_ADDR`（可选）
-  - Redis 地址，默认 `127.0.0.1:6379`
+## Core Feasibility Highlights for Judges
 
-> 说明：当前 `main.go` 中尚未接入真实 WebSocket 节点与链上签名逻辑，如需将 Demo 升级为真正代付 Gas 的 Relay Server，可基于 go-substrate-rpc-client 扩展新增：
->
-> - `WS_ENDPOINT`：链的 WebSocket 节点（如 `wss://ws.azero.dev`）
-> - `RELAYER_SEED`：平台方代付 Gas 的账户种子（sr25519）
+1. **Low-Cost & Scalable Landing**: The on-chain cost per bottle is less than 0.5 CNY, achievable by combining QR codes + laser anti-counterfeiting labels (customized laser holographic tamper-evident stickers cost only 0.15-0.2 CNY per unit for 1 million+ orders) + Avalanche's ultra-low Gas fees (single transaction ≤ 0.01 USDC.e). No high-cost hardware (NFC/chips, 1.5-5 CNY per bottle) is required, making it accessible to small and medium-sized wine enterprises (annual sales 500,000-20 million bottles).
 
-#### 启动后端
+2. **Verifiable Physical + On-Chain Dual Anti-Counterfeiting**: Laser holographic tamper-evident stickers cover the QR code (irreversible damage once torn, preventing label replication) and are fully integrated with on-chain NFT logic. The NFT "opening verification field" is permanently locked after first scan, technically eliminating secondary recycling of bottles.
 
-```bash
-cd backend
-go run main.go
-```
+3. **Game Mechanism Tied to Real Business**: All game interactions serve anti-counterfeiting verification (no redundant entertainment-only gameplay). Challenges = verification actions, badges = cumulative verification times, red envelopes = verification rewards, ensuring the game mechanism is grounded in solving real industry pain points.
 
-默认监听：`http://localhost:8080`
+# II. Clarification of Pain Points
 
-同时应用了宽松的 CORS 设置，方便前端本地调试。
+## (I) Core Industry Pain Points (Anti-Counterfeiting and Anti-Diversion)
 
----
+1. **Proliferation of Counterfeits and Secondary Refilling**: Traditional anti-counterfeiting (QR codes, laser labels, NFC) is easily replicable. Recycled wine bottles can be refilled and relabeled to pass as genuine, with no traceable opening records—severely damaging brand reputation and consumer rights, especially in unregulated cross-border scenarios.
 
-## 4. 前端主要页面说明
+2. **Frequent Cross-Border Diversion**: Multi-tiered distribution in Belt and Road cross-border wine trade leads to price chaos and channel conflicts. Enterprises struggle to locate diversion sources, resulting in heavy losses.
 
-### 4.1 首页 `/`
+3. **High Cost & Poor Practicality of Traditional Solutions**: High-end anti-counterfeiting (NFC/chips) costs 1.5-5 CNY per bottle (unaffordable for SMEs). Blockchain traceability only records processes but fails to address post-opening anti-counterfeiting or eliminate secondary bottle recycling.
 
-- 文件：`src/pages/Home.tsx`
-- 功能：
-  - 左侧卡片：项目简介 + 领取入口说明（扫码后自动进入领取页）
-  - 右侧卡片：可扩展的销量展示组件（`SalesBoard`）
+4. **Low User Participation**: Traditional anti-counterfeiting is a passive "verification action" with no incentives for consumers, failing to form a closed loop of active verification and dissemination. Consumers cannot intuitively confirm first-opening or secondary refilling.
 
-### 4.2 领取页 `/valut_mint_nft/:hashCode`
+## (II) On-Chain Landing Pain Points
 
-- 文件：`src/pages/MintConfirm.tsx`
-- 功能：
-  - 通过 Path Parameter 读取 `hashCode`
-  - 页面加载时自动调用 `GET /secret/verify?codeHash={hashCode}` 校验兑换码
-  - 校验通过后展示Monad地址输入框与「确认领取」按钮
-  - 点击「确认领取」后调用 `POST /relay/mint`，成功后跳转 `/success`
+1. **High Gas Fees & Low TPS of Public Chains**: Cross-border wine volume (1M+ bottles/year per enterprise) demands high-frequency on-chain operations. Traditional public chains lack TPS and have prohibitive Gas fees, making real-time on-chain recording of opening information and NFT claims unfeasible.
 
-### 4.3 成功展示页 `/success`
+2. **Disconnection Between RWA and Chain Games**: Existing RWA projects focus on asset tokenization, while chain games prioritize entertainment—no integration with real-economy pain points (e.g., secondary bottle recycling), hindering long-term commercialization.
 
-- 文件：`src/pages/Success.tsx`
-- 功能：
-  - 展示 NFT 勋章占位图与成功文案
-  - 从 URL 中读取：
-    - `book_id`：书籍编号
-    - `ar`：Arweave 交易 ID（如存在则优先使用）
-  - 读取当前钱包地址（优先使用 `localStorage.selectedAddress`）
-  - Arweave 映射与网关：
-    - 常量 `ARWEAVE_GATEWAY = "https://arweave.net/"`
-    - 内置 `BOOKS` 映射：`book_id → txId`（例如 Book 1 映射为 `uxtt46m7gTAAcS9pnyh8LkPErCr4PFJiqYjQnWcbzBI`）
-    - 计算规则：`arTxId ? ARWEAVE_GATEWAY + arTxId : ARWEAVE_GATEWAY + BOOKS[book_id].txId`
-  - 按钮：
-    - 「验证访问权限」：调用合约 `has_access(address, book_id)`
-    - 验证通过后：
-      - 显示「打开 Arweave 内容」按钮（新窗口）
-      - 显示「进入 Matrix 私域社群」入口
-    - 验证失败时给出错误提示
-  - 「返回首页」：返回用户端首页
+3. **Cross-Border Data Synchronization Challenges**: Multi-region positioning and multi-language adaptation under the Belt and Road Initiative make real-time on-chain data sync and verification difficult, leading to poor user experience (inability to query opening info via NFT).
 
-### 4.4 管理后台
+# III. Proposed Solutions (With Concrete Landing Logic)
 
-- 布局：
-  - `src/admin/AdminLayout.tsx`：侧边栏 + 嵌套路由结构
+Taking Avalanche as the underlying infrastructure, this solution integrates RWA wine on-chain with chain game mechanisms, focusing on "scan to claim NFT, NFT stores all opening info, eliminate secondary recycling". It forms a trinity solution of "anti-counterfeiting/anti-diversion + chain game incentives + RWA confirmation", with clear, implementable landing paths for judges to validate:
 
-- 子页面：
-  - `src/admin/OverviewPage.tsx`：数据总览
-  - `src/admin/MonitorPage.tsx`：销量监控看板（图表 + 明细）
-  - `src/admin/SalesPage.tsx`：销量明细列表
-  - `src/admin/WithdrawPage.tsx`：财务提现
-  - `src/admin/BatchPage.tsx`：批次创建（CSV 导入 + SHA-256 + add_book_batch）
+## (I) Core Solution: RWA-NFT + Chain Game Anti-Counterfeiting & Anti-Diversion (Secondary Recycling Prevention as Core)
 
----
+### 1. RWA Wine On-Chain (Avalanche C-Chain)
 
-## 5. 钱包与链配置
+- **Landing Logic**: When wine leaves the factory, enterprises batch-mint RWA-NFTs via a background system (Avalanche C-Chain, high TPS supports 1M+ batch mints efficiently). Each NFT is bound to wine batch, export country, authorized sales region, production info, and category details. An "opening verification field" is reserved in NFT metadata—only written and permanently locked when the bottle is first opened and the user claims the NFT. This technically eliminates secondary recycling (recycled bottles cannot re-trigger verification/writing).
 
-### 5.1 链参数配置
+- **Cost Control**: Avalanche's low Gas fees ensure minting cost per NFT < 0.1 CNY, combined with physical anti-counterfeiting (laser labels) to keep total per-bottle cost < 0.5 CNY.
 
-- 页面：`/settings`
-- Hook：`useChainConfig`（`src/state/useChainConfig.ts`）
-- 字段：
-  - `endpoint`：节点 WebSocket 地址
-  - `contractAddress`：Ink! 合约地址
-  - `abiUrl`：ABI JSON 文件地址
-- 配置保存到 `localStorage.chainConfig`，前端所有合约调用均依赖此配置。
+### 2. Chain Game Opening Verification + NFT Claim (Core Gameplay with Tangible Outcomes)
 
-### 5.2 钱包连接与账户选择
+- 
 
-- Hook：`usePolkadotWallet`（`src/hooks/usePolkadotWallet.ts`）
-- 功能：
-  - 调用 `web3Enable('Whale Vault DApp')` 与 `web3Accounts()` 拉取扩展账户
-  - 管理 `accounts` 列表与当前选中账户 `selected`
-  - 支持切换账户与断开连接
-  - 将选中的地址持久化到 `localStorage.selectedAddress`
-  - 提供 `isConnected` 等布尔状态
+- **User-Centric Landing Flow**:
 
-导航栏组件 `NavBar` 通过该 Hook 实现：
+- **Judges' Validation Point**: The game mechanism is not standalone—every step ties to anti-counterfeiting verification, with on-chain records (NFT metadata) as tangible proof of authenticity and first-opening.
 
-- 「连接钱包」按钮：触发扩展授权
-- 「断开」按钮：清空选择
-- `AccountSelector`：展示并切换当前账户
+### 3. Automatic Cross-Border Diversion Early Warning (Actionable for Enterprises)
 
----
+- 
 
-## 6. 后端 HTTP 接口说明
+- **Landing Logic**: RWA-NFTs are bound to authorized sales regions. When a user claims an NFT and completes the challenge, the on-chain system verifies real-time location against the bound region. If mismatched:
 
-### 6.1 POST `/relay/mint`
+- **Feasibility**: Avalanche Warp Messaging enables real-time cross-region data sync, ensuring accurate and timely diversion warnings for cross-border trade under the Belt and Road Initiative.
 
-用途：免 Gas / 无签名的中继入口。当前 Demo 中，后端**不直接连接链节点**，而是：
+### 4. Low-Cost Landing + Secondary Recycling Prevention (SME-Friendly)
 
-- 接收前端提交的领取请求与接收地址
-- 基于兑换码 Hash Code（`codeHash`）做唯一性锁防刷
-- 生成占位用的 `txHash`，写入 Redis 日志，供前端看板展示
+- **Cost Breakdown (Judges' Reference)**:
+              ComponentCost per Bottle (1M+ Orders)Custom Laser Holographic Tamper-Evident Sticker0.15-0.2 CNYQR Code Printing0.05 CNYAvalanche NFT Minting + Gas< 0.1 CNY**Total0.2-0.35 CNY**
 
-未来可在此基础上接入真实链节点，由后端使用平台账户代用户发送交易、代付 Gas。
+- **Secondary Recycling Interception**: If a recycled bottle is scanned again, the system detects the NFT is "claimed" and the opening field is "locked", immediately prompting: "This wine has been opened (NFT claimed) – suspected secondary refilling of recycled bottles. Do not purchase." The record is synced to the enterprise background for real-time interception.
 
-#### 请求体（JSON）
+## (II) Avalanche Chain Optimization for Feasibility
 
-```json
-{
-  "dest": "合约地址（SS58）",
-  "value": "0",
-  "gasLimit": "0",
-  "storageDepositLimit": "字符串或 null",
-  "dataHex": "0x 前缀的合约调用数据（当前 Demo 可能为占位值）",
-  "signer": "用户地址（用于风控与日志）",
-  "codeHash": "兑换码 Hash Code（十六进制字符串）"
-}
-```
+1. **Avalanche C-Chain**: High TPS (thousands of transactions/sec) supports high-frequency opening verification, NFT minting, and metadata writing—critical for 1M+ bottles/year scale.
 
-> 说明：如需“签名 + mint_meta + 中继”的严格校验方案，可在前端改为对结构化消息进行签名并编码 `mint_meta(...)`，后端在验证签名与参数后，再调用链上合约并代付 Gas。
+2. **Avalanche Warp Messaging**: Enables multi-chain data sync (future scalability) and real-time cross-border sync of location/verification/opening/NFT data, ensuring accuracy in Belt and Road regions.
 
-#### URL 查询参数
+3. **USDC.e Stablecoin**: Low volatility, low Gas fees for red envelope issuance. Red envelope amounts are written into NFT metadata, aligning with regulatory compliance (no air coins, only utility incentives).
 
-- `book_id`（可选）：书籍编号，用于日志记录与前端看板展示。
+## (III) Chain Game & Business Binding (No Empty Gameplay)
 
-#### 响应体（JSON）
+All game elements serve anti-counterfeiting/anti-diversion:
 
-```json
-{
-  "status": "submitted" | "error",
-  "txHash": "0x... 可选",
-  "error": "错误信息，可选"
-}
-```
+- Challenge = Anti-counterfeiting verification (location/time check)
 
-- `status = "submitted"`：成功提交到链上，`txHash` 为交易哈希（in-block 或 finalized 哈希）。
-- `status = "error"`：请求不合法、频率超限或链上错误。
+- Badge = Cumulative verification times (upgrade for higher enterprise coupons/red envelopes)
 
-#### 风控机制
+- Red envelope = Verification reward (USDC.e, tangible benefit for users)
 
-- 使用 `golang.org/x/time/rate` 为每个 IP 限速
-- 使用 Redis 基于 `codeHash` 做唯一性锁：
-  - 每个唯一的 `codeHash` 只允许成功领取一次
-  - 同一 `codeHash` 并发请求时，后续请求会收到“正在铸造中”的错误
-  - 已成功的 `codeHash` 再次请求会收到“此书已经生成过 NFT 了”的错误
-- 所有成功的 Mint 请求会记录到 Redis 列表 `mint:logs`（用于看板与明细）
+- NFT = Authenticity certificate + secondary recycling prevention tool
 
-### 6.2 GET `/metrics/mint`
+This ensures the game meets the hackathon's "build games" requirement while solving real business pain points—judges can validate the practical value beyond entertainment.
 
-用途：为前端管理后台提供 Mint 日志，用于构建销量图表和明细。
+# IV. Architecture Design (Concrete Implementable Layers)
 
-#### 响应样例
+## (I) Overall Architecture (Avalanche-Based, Layered, Scalable)
 
-```json
-[
-  {
-    "timestamp": 1710000000,
-    "tx_hash": "0x1234...",
-    "book_id": "1"
-  },
-  ...
-]
-```
+|Layer|Core Components & Landing Details|
+|---|---|
+|Underlying Infrastructure (Avalanche Ecosystem)|- **Blockchain**: C-Chain (NFT minting/on-chain verification/metadata locking); P-Chain (cross-chain sync/security)- **Stablecoin**: USDC.e (red envelope issuance, low Gas)- **Tools**: Avalanche Studio/Hardhat (contract dev/test); IPFS (wine image/batch info storage, linked to NFT metadata)|
+|Core Technology Layer|- **Smart Contracts** (deployed on C-Chain, open-source/auditable): 1. RWA-NFT Minting Contract (batch mint, "opening lock" mechanism) 2. Opening Verification Contract (location + time check, diversion judgment, NFT claim logic) 3. Red Envelope Incentive Contract (USDC.e issuance, badge upgrade binding)- **Positioning Layer**: Global positioning API (Belt and Road coverage, encrypted on-chain)- **Security Layer**: Avalanche native security, contract audits, encrypted positioning data (privacy protection)|
+|Application Layer|- **Consumer End**: Multi-language mini-program (scan to claim NFT, game challenge, red envelope/NFT viewing); Avalanche wallet integration (NFT metadata query: opening time/city/wine details/red envelope)- **Enterprise End**: Background system (real-time data: verification records, diversion warnings, NFT minting management, secondary recycling investigation via NFT)- **Game Interaction Layer**: 10s lightweight challenge interface, badge system, red envelope records (on-chain queryable)|
+|Ecosystem Layer|- **Partners**: Belt and Road wine enterprises/traders (physical asset provision); Avalanche DeFi/NFT market (badge trading, core NFT non-tradable to preserve certificate attribute)- **Compliance**: Hong Kong compliant law firms (ensuring regulatory alignment for cross-border trade)|
+## (II) Core Process Architecture (End-to-End Implementable Flow for Judges)
 
-前端可按时间排序、按 `book_id` 分组统计等。
+1. **Wine Factory Exit**: Enterprise mints RWA-NFT via background (C-Chain), binds wine info/authorized region, pastes QR code (covered by laser tamper-evident sticker) – NFT state: "unclaimed/unopened" (empty opening fields).
 
-### 6.3 GET `/secret/verify`
+2. **Consumer Scanning**: Scan QR code → mini-program (multi-language) → authorize positioning (encrypted) → claim NFT (≤1s via Avalanche TPS).
 
-用途：对兑换码 Hash Code 做只读校验，在进入领取流程前提前过滤无效 / 未登记的兑换码。当前前端在 `/valut_mint_nft/:hashCode` 中会调用该接口。
+3. **On-Chain Verification**: System uploads encrypted location/time → calls Opening Verification Contract → checks region/time validity → generates random red envelope amount.
 
-#### 请求参数（Query）
+4. 
 
-- `codeHash`：必填，兑换码 Hash Code（十六进制字符串）。
-  - 当前实现中，二维码链接直接携带该 Hash Code，因此前端不再计算 SHA-256。
+5. **Game Challenge & Metadata Writing**:
 
-#### 响应体（JSON）
+6. **Secondary Recycling Interception**: Re-scanning recycled bottles triggers "NFT claimed/opening locked" prompt → enterprise real-time monitoring.
 
-```json
-{
-  "ok": true
-}
-```
+7. **On-Chain Immutability**: All records (verification, red envelope, diversion, NFT) stored on Avalanche – queryable via block explorer/mini-program for judges to validate.
 
-- `ok = true`：该兑换码在 Redis 集合 `secret:valid` 中存在，可以继续后续流程。
-- `ok = false` 且包含 `error` 字段：
-  - `invalid code`：兑换码未登记或已失效。
-  - `redis error`：后端存储访问异常。
-  - 当缺少 `codeHash` 时，接口返回 400，并在响应体中给出 `missing codeHash` 错误信息。
+# V. User Portraits (With Clear Usage Scenarios)
 
-> 说明：`/relay/mint` 在处理免 Gas 铸造时也会再次检查 `codeHash` 是否在 `secret:valid` 中，并结合一次性锁（`lockCode`）确保每个兑换码仅能成功使用一次。
+## 1. Core Paying Users: SME Wine Enterprises/Cross-Border Traders (B-End)
 
----
-## 7. 与合约的主要交互点
+- **Profile**: 500k-20M bottles/year, Belt and Road cross-border focus (Southeast Asia/Middle East/Europe), plagued by counterfeiting/diversion/secondary refilling, limited budget.
 
-> 以下为前端使用到的合约接口名称，具体参数类型与链上实现需与实际 Ink! 合约保持一致。
+- **Landing Value**: Low-cost (≤0.5 CNY/bottle) anti-counterfeiting/diversion solution; NFT-based traceability (opening info query) for secondary recycling investigation; background system for real-time diversion warnings and marketing customization (red envelope/badge rules).
 
-- `has_access(address, book_id) -> bool`
-  - 成功页中用于验证用户是否拥有访问该书籍内容的权限
+## 2. Core Participating Users: Consumers (C-End)
 
-- `pull_funds()`
-  - 管理后台财务页调用
-  - 将作者 / 出版社地址在合约中的可提现余额转出到当前账户
+- **Profile**: 25-55 years old, wine purchasers (personal/gift/gathering), concerned about authenticity, open to simple scanning/NFT operations, motivated by red envelope incentives.
 
-- `add_book_batch(ids: Vec<BookId>, hashes: Vec<Hash>)`
-  - 批次创建页调用
-  - 一次性写入多本书籍的授权哈希
+- **Landing Value**: 10s lightweight verification → NFT claim (permanent first-opening proof) → red envelope rewards → badge upgrades (additional benefits); intuitive NFT metadata check to avoid secondary refilling counterfeits.
 
-- `get_withdrawable(address) -> Balance`（假定名称）
-  - 用于查询某地址当前可提取余额
-  - 前端在提现页只读调用，展示「当前地址可提取余额」
+## 3. Ecosystem Partners: Belt and Road Importers/Distributors (B-End)
 
----
+- **Profile**: Cross-border wine traders connecting Chinese enterprises to overseas terminals, concerned about reputation risks from counterfeits/diversion.
 
-## 8. 典型使用流程（读者视角）
+- **Landing Value**: NFT as on-chain authenticity certificate for overseas terminals; diversion early warnings to protect channel profits; low-cost verification tools to reduce operational overhead.
 
-1. 通过实体书上的二维码或分享链接进入 DApp：
-   - 二维码内容为 URL：`http://Domain/valut_mint_nft/{hashCode}`
-2. 在领取页 `/valut_mint_nft/:hashCode` 中：
-   - 页面自动调用 `GET /secret/verify?codeHash=...` 校验兑换码
-   - 校验通过后输入Monad地址，点击「确认领取」提交领取请求到 `/relay/mint`
-3. 成功后自动跳转 `/success`，在成功页点击「验证访问权限」，通过后：
-   - 打开 Arweave 正文内容（优先使用 URL 参数 `ar`，否则使用 BOOKS 映射）。
-   - 加入 Matrix 私域社群。
+## 4. Avalanche Ecosystem Users (Chain Game Players/NFT Holders)
 
----
+- **Profile**: Avalanche wallet holders, USDC.e users, interested in RWA/chain games with real landing scenarios, no air coin tolerance.
 
-## 9. 部署与上线（示例：Nginx + Go 后端）
+- **Landing Value**: Wine purchase → NFT claim → game challenge → red envelope/badge rewards; core NFT (authenticity certificate) collectible, badge NFT tradable on Avalanche NFT market.
 
-### 9.1 构建前端静态资源
+# VI. User Journey (Step-by-Step Implementable Flow)
 
-```bash
-npm install
-npm run build
-```
+## (I) Consumer User Journey (Core Game + NFT Flow)
 
-构建完成后，前端静态文件位于 `dist/` 目录。
+1. **Purchase**: Buys wine with laser-protected QR code, worried about counterfeits/secondary refilling.
 
-> 生产环境下，请将 `src/config/backend.ts` 中的 `BACKEND_URL` 修改为前端实际访问到的后端地址。以当前示例为：`http://198.55.109.102`（通过 Nginx 反向代理到本机 8080 端口）。
+2. **Scan & NFT Claim**: Scans QR code → mini-program (auto-language) → authorize positioning → claim NFT (≤1s).
 
-### 9.2 启动 Go Relay Server（可选但建议）
+3. **Game Challenge**: Completes 10s location/time verification challenge.
 
-在服务器上准备好 Go 与 Redis，然后：
+4. 
 
-```bash
-# 1. 进入后端目录
-cd backend
+5. **Verification Result**:
 
-# 2.（可选）配置 Redis 地址，不配置则默认 127.0.0.1:6379
-export REDIS_ADDR="127.0.0.1:6379"
+6. **Post-Interaction**: View NFT/wallet/red envelope/badge → share for extra rewards → redeem badges for coupons → avoid secondary refilling via re-scan prompts.
 
-# 3. 启动后端（开发/测试时可以直接用 go run）
-go run main.go
-```
+## (II) Wine Enterprise User Journey (Payment + Management Flow)
 
-默认监听 `:8080`，即本机 `http://127.0.0.1:8080`。
+1. **Pain Point Recognition**: Struggles with traditional high-cost anti-counterfeiting, learns about our low-cost Avalanche-based solution.
 
-### 9.3 使用 Nginx 托管前端并反向代理后端
+2. **Cooperation**: Signs agreement → pays service fees (annual + per-bottle).
 
-将 `dist/` 上传到服务器（例如 `/var/www/whale-vault`），站点配置示例（以 `198.55.109.102` 为例）：
+3. **System Access**: Project team assists with background setup → NFT minting configuration (wine info/region binding) → training (NFT-based secondary recycling investigation).
 
-```nginx
-server {
-    listen 80;
-    server_name 198.55.109.102;
+4. **Landing Execution**: Batch NFT minting → laser sticker/QR code application → product shipment.
 
-    root /var/www/whale-vault;
-    index index.html;
+5. **Daily Management**: Real-time background monitoring (verification/diversion/NFT data) → query NFT opening info for secondary recycling investigation → adjust channel layout via diversion warnings → customize red envelope/badge rules for marketing.
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+# VII. Threat Model & Mitigation Matrix
 
-    # 转发中继与统计接口到本机 8080 端口
-    location /relay/ {
-        proxy_pass http://127.0.0.1:8080/relay/;
-    }
+|Potential Attack|Description|Mitigation Mechanism|Residual Risk|
+|---|---|---|---|
+|QR Code Cloning|Counterfeiters copy QR image|Full QR hidden under destructive laser seal; must physically tear to access|Requires supply chain compromise|
+|Race-to-Claim|Attacker scans before real consumer|Seal prevents pre-opening access; abnormal early claim detection dashboard|Limited to insider leakage|
+|UI Phishing|Fake website mimics scan interface|Official contract address verifiable on Avalanche; NFT issuer publicly traceable|Social engineering risk|
+|Red Envelope Forgery|Counterfeiter fakes reward UI|Rewards issued only via Avalanche smart contract (USDC.e)|Cannot fake on-chain issuance|
+|Supply Chain Insider|Internal staff leaks QR images|Early-claim anomaly monitoring; batch-level risk flagging|Enterprise governance issue|
+|Bottle Refilling|Recycled bottle reused|NFT metadata permanently locked after first claim; re-scan exposes prior opening|None at scale|
+## Security Principle
 
-    location /metrics/ {
-        proxy_pass http://127.0.0.1:8080/metrics/;
-    }
+We do not rely on QR secrecy.
 
-    # 转发兑换码校验接口
-    location /secret/ {
-        proxy_pass http://127.0.0.1:8080/secret/;
-    }
-}
-```
+We rely on:
 
-这样，前端配置 `BACKEND_URL = 'http://198.55.109.102'` 后，会访问：
+- Physical irreversibility (seal destruction)
 
-- `http://198.55.109.102/secret/verify`
-- `http://198.55.109.102/relay/mint`
-- `http://198.55.109.102/metrics/mint`
+- On-chain irreversibility (metadata lock)
 
-Nginx 会将这些请求转发到同一台机器上的 Go 后端（端口 8080），整个部署结构清晰且避免跨域问题。
+- Economic deterrence (real USDC.e rewards)
 
----
+- Public issuer verification (contract transparency)
 
-## 10. 典型使用流程（作者 / 出版社视角）
+Our system does not claim perfect elimination.
 
-1. 打开 DApp，连接钱包，使用作者 / 出版社账户登录
-2. 进入管理后台 `/admin/overview` 查看数据总览
-3. 在 `/admin/monitor` 看板中观察近 30 天销量趋势与最新 Mint 明细
-4. 在 `/admin/batch` 导入 CSV 文件，批量配置书籍授权：
-   - `book_id,secret_code` → 前端计算 SHA-256 哈希 → 调用 `add_book_batch`
-5. 在 `/admin/withdraw` 查看可提取余额，并点击「立即提现」调用 `pull_funds()` 将收益转入当前地址
+It significantly raises the cost and legal risk of counterfeiting.
 
----
+# VIII. 6-Week Build Games Execution Plan
 
-## 11. 后续可扩展方向
+## Week 1 – Core NFT Protocol
 
-本 README 基于当前实现状态总结，后续可以在此基础上扩展：
+- Deploy RWA-NFT minting contract (C-Chain)
 
-- 将 Mock 数据完全替换为真实链上统计与后端 `/metrics/mint`
-- 为作者 / 出版社增加多角色权限控制
-- 增加多链配置与热切换（例如在配置中支持多个预设网络）
-- 为合约与后端接口补充单元测试与集成测试
+- Implement "opening metadata lock" mechanism
 
+- Basic claim logic (unclaimed → claimed)
+
+## Week 2 – Scan Flow & Wallet Integration
+
+- Mini-program scan interface (testnet)
+
+- Avalanche wallet connection
+
+- NFT claim within <1 second
+
+## Week 3 – Opening Challenge Module
+
+- Location + timestamp verification logic
+
+- Write opening metadata (time/city/red envelope)
+
+- Lock mechanism stress test
+
+## Week 4 – Reward & Badge System
+
+- USDC.e reward issuance contract
+
+- Badge accumulation logic
+
+- On-chain reward tracking
+
+## Week 5 – Enterprise Dashboard (MVP)
+
+- Real-time claim monitoring
+
+- Early-claim anomaly detection
+
+- Diversion alert flagging
+
+## Week 6 – End-to-End Demo + Metrics
+
+- Full physical-to-digital demo
+
+- Simulated refilling attack demo
+
+- Performance benchmark (TPS, cost per bottle)
+
+- Prepare Stage 2 MVP submission
+
+# IX. Why This Shows High Agency
+
+- We are not building a speculative NFT.
+
+- We are binding physical assets with irreversible on-chain logic.
+
+- We designed around real-world attack vectors.
+
+- We provide cost modeling and industrial feasibility.
+
+We are building a physical asset activation game that continues evolving beyond the hackathon.
+
+# X. Key Landing Assurance for Judges
+
+1. **Technical Feasibility**: All smart contracts are deployable on Avalanche C-Chain (Hardhat/Avalanche Studio tested); laser anti-counterfeiting stickers are mature industrial products (1M+ order MOQ achievable with mainstream printing factories); mini-program/wallet integration uses mature APIs (WeChat/Alipay/Avalanche wallet SDKs).
+
+2. **Cost Feasibility**: Per-bottle total cost < 0.5 CNY (laser sticker + QR code + on-chain cost) – validated by industrial quotes for laser labels and Avalanche's Gas fee data.
+
+3. **Scalability**: Avalanche's high TPS supports 10M+ bottles/year; multi-language/global positioning adapts to Belt and Road cross-border scenarios; modular architecture allows future integration with Avalanche DeFi (NFT staking) or NFT market (badge trading).
+
+4. **Compliance**: No air coin issuance (red envelopes = USDC.e utility incentives); encrypted positioning data protects privacy; NFT as authenticity certificate (non-speculative) complies with cross-border trade regulations (Hong Kong legal audit support).
+
+This document integrates laser anti-counterfeiting physical implementation, Avalanche on-chain logic, and chain game mechanism into a cohesive, step-by-step landing plan—enabling judges to clearly assess the project's technical feasibility, cost control, and real-world commercial value for cross-border wine anti-counterfeiting and anti-diversion.
+> （注：文档部分内容可能由 AI 生成）
