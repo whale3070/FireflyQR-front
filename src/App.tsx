@@ -18,7 +18,8 @@ import OverviewPage from "./admin/OverviewPage";
 import AddBookPage from "./admin/AddBookPage";
 import QrCodePage from "./admin/QrCodePage";
 import AnalyticsPage from "./admin/AnalyticsPage";
-import TopUpPage from "./admin/TopUpPage"; // ✅ 新增：多资产充值入口
+import NFTDepositPoolPage from "./admin/NFTDepositPoolPage";
+import NFTOwnersPage from "./admin/NFTOwnersPage";
 
 // 模式切换
 import { AppModeProvider } from "./contexts/AppModeContext";
@@ -90,8 +91,8 @@ export default function App() {
                 <Route path="add-book" element={<AddBookPage />} />
                 <Route path="qrcode" element={<QrCodePage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
-                {/* ✅ 新增：多资产充值入口 */}
-                <Route path="topup" element={<TopUpPage />} />
+                <Route path="topup" element={<NFTDepositPoolPage />} />
+                <Route path="nft-owners" element={<NFTOwnersPage />} />
               </Route>
 
               {/* 404 */}
@@ -130,7 +131,7 @@ export default function App() {
                 </Link>
               </div>
               <div className="uppercase tracking-widest text-right text-accent-light/70">
-                Anti-counterfeit · No refill · Whale Vault · Avalanche C-Chain
+                Anti-counterfeit · No refill · Whale Vault · Polkadot Testnet
               </div>
             </div>
           </footer>

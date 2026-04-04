@@ -52,3 +52,25 @@ h1, h2, h3, .font-display {
 ::-webkit-scrollbar-thumb:hover {
   background: #C9A227;
 }
+
+/* 成功页沙漏动画：沙从上漏到下 */
+@keyframes hourglass-drain {
+  0% { opacity: 0.95; transform: scaleY(1); }
+  45% { opacity: 0.95; transform: scaleY(1); }
+  55% { opacity: 0.2; transform: scaleY(0.1); }
+  100% { opacity: 0.2; transform: scaleY(0.1); }
+}
+@keyframes hourglass-fill {
+  0% { opacity: 0.2; transform: scaleY(0.1); }
+  45% { opacity: 0.2; transform: scaleY(0.1); }
+  55% { opacity: 0.95; transform: scaleY(1); }
+  100% { opacity: 0.95; transform: scaleY(1); }
+}
+.hourglass-sand-top {
+  transform-origin: 50% 100%;
+  animation: hourglass-drain 4s ease-in-out infinite;
+}
+.hourglass-sand-bottom {
+  transform-origin: 50% 0%;
+  animation: hourglass-fill 4s ease-in-out infinite;
+}

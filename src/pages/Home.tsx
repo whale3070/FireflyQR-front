@@ -75,7 +75,7 @@ export default function Home() {
 
             <div className="text-center">
               <p className="text-sm text-[#F5F0E8]/50">
-                Avalanche C-Chain
+                Polkadot Testnet
               </p>
             </div>
           </div>

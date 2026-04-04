@@ -94,10 +94,42 @@ export const useApi = () => {
       if (codeHash != null && codeHash.trim() !== "") {
         body.code_hash = codeHash.startsWith("0x") ? codeHash.slice(2) : codeHash.trim();
       }
-      return apiFetch<ApiResponse<{ tx_hash: string }>>(`/relay/mint`, {
+      return apiFetch<ApiResponse<{ tx_hash: string; status?: string }>>(`/relay/mint`, {
         method: "POST",
         body: JSON.stringify(body),
       });
+    },
+    [apiFetch]
+  );
+
+  /**
+   * 二次激活收款地址：后端返回用户应转 1.1 PAS 的地址（须为 EOA，避免 missing revert data）
+   * GET /api/v1/nft/secondary-activate-receiver
+   */
+  const getSecondaryActivateReceiver = useCallback(async () => {
+    return apiFetch<{ ok: boolean; payment_receiver?: string; error?: string }>(
+      `/api/v1/nft/secondary-activate-receiver`,
+      { method: "GET" }
+    );
+  }, [apiFetch]);
+
+  /**
+   * 二次激活：用户已向收款地址转账 1.1 PAS，后端校验后为该钱包铸造新 NFT
+   * POST /api/v1/nft/secondary-activate
+   */
+  const secondaryActivate = useCallback(
+    async (contract: string, paymentTxHash: string, walletAddress: string) => {
+      return apiFetch<ApiResponse<{ tx_hash: string; message?: string }>>(
+        `/api/v1/nft/secondary-activate`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            contract,
+            payment_tx_hash: paymentTxHash,
+            wallet_address: walletAddress,
+          }),
+        }
+      );
     },
     [apiFetch]
   );
@@ -117,6 +149,11 @@ export const useApi = () => {
           tokenId: string;
           contract: string;
           txHash: string;
+          imageUrl?: string;
+          image_url?: string;
+          image?: string;
+          metadataUrl?: string;
+          metadata_url?: string;
         }>
       >(`/relay/tx/${encodeURIComponent(txHash)}`, { method: "GET" });
     },
@@ -310,7 +347,7 @@ export const useApi = () => {
       const publisher = (publisherAddrOrAddress || "").trim();
       const ch = (codeHash || "").trim();
 
-      return apiFetch<{ ok: boolean; balance: string; maxDeploys: number }>(
+      return apiFetch<{ ok: boolean; balance: string; symbol?: string; maxDeploys?: number }>(
         `/api/v1/publisher/balance?publisher=${encodeURIComponent(publisher)}&address=${encodeURIComponent(
           publisher
         )}&codeHash=${encodeURIComponent(ch)}`,
@@ -320,6 +357,7 @@ export const useApi = () => {
           return {
             ok: true,
             balance: (Math.random() * 200).toFixed(2),
+            symbol: "CFX",
             maxDeploys: Math.floor(Math.random() * 20) + 5,
           };
         }
@@ -391,10 +429,40 @@ export const useApi = () => {
 
   /**
    * 市场数据：GET /api/v1/market/tickers
+   * 后端可能返回 JSON 数组；Mock 返回 { data, total, page }
    */
   const fetchBooks = useCallback(
     async (page = 1) => {
-      return apiFetch<{ data: typeof MOCK_BOOKS; total: number; page: number }>(
+      const pickLang = (m: unknown): string => {
+        if (typeof m === "string" && m.trim()) return m.trim();
+        if (!m || typeof m !== "object") return "";
+        const o = m as Record<string, string>;
+        return o.zh || o.en || Object.values(o).find((v) => v && String(v).trim()) || "";
+      };
+
+      const mapTickerRow = (b: Record<string, unknown>): (typeof MOCK_BOOKS)[number] => {
+        const symbol = String(b.symbol || "BOOK").trim() || "BOOK";
+        const addr = String(b.address || "").trim();
+        const sales = Number(b.sales ?? 0);
+        const ch = String(b.change || "+0%");
+        return {
+          id: addr || symbol,
+          title: pickLang(b.name) || symbol,
+          author: pickLang(b.author) || "—",
+          coverImage: "https://placehold.co/120x120/e2e8f0/64748b?text=NFT",
+          contractAddress: addr || undefined,
+          currentPrice: sales,
+          symbol,
+          verificationStatus: "Verified Genuine",
+          predictionPool: Math.max(1000, sales * 12),
+          predictionTimeLeft: "07D 12H",
+          sales,
+          change: ch,
+          description: "",
+        };
+      };
+
+      const raw = await apiFetch<unknown>(
         `/api/v1/market/tickers?page=${encodeURIComponent(String(page))}`,
         { method: "GET" },
         async () => {
@@ -402,6 +470,19 @@ export const useApi = () => {
           return { data: MOCK_BOOKS, total: MOCK_BOOKS.length, page };
         }
       );
+
+      if (Array.isArray(raw)) {
+        const data = raw.map((row) => mapTickerRow(row as Record<string, unknown>));
+        return { data, total: data.length, page };
+      }
+
+      if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+        const r = raw as { data: Record<string, unknown>[]; total?: number; page?: number };
+        const data = r.data.map((row) => mapTickerRow(row));
+        return { data, total: r.total ?? data.length, page: r.page ?? page };
+      }
+
+      return { data: MOCK_BOOKS, total: MOCK_BOOKS.length, page };
     },
     [apiFetch]
   );
@@ -414,6 +495,8 @@ export const useApi = () => {
     // 读者
     mintNFT,
     queryTransaction,
+    getSecondaryActivateReceiver,
+    secondaryActivate,
 
     // 验证
     verifyCode,

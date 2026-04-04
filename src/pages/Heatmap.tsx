@@ -159,7 +159,7 @@ const Heatmap: React.FC = () => {
         const option: EChartsOption = {
           backgroundColor: "#0f172a",
           title: {
-            text: `🐋 WHALE VAULT - 全球读者回响分布 (${modeLabel})`,
+            text: `🐋 WHALE VAULT - 全球用户分布 (${modeLabel})`,
             left: "center",
             top: 40,
             textStyle: { color: "#22d3ee", fontWeight: "lighter", fontSize: 24 },
@@ -173,7 +173,7 @@ const Heatmap: React.FC = () => {
               const count = params?.value?.[2] ?? 0;
               return `<div style="padding:8px">
                 <div style="font-weight:bold;margin-bottom:4px">${params.name}</div>
-                <div style="color:#22d3ee">📖 ${count} 位读者已点亮 (${modeLabel})</div>
+                <div style="color:#22d3ee">📖 ${count} 位用户已点亮 (${modeLabel})</div>
               </div>`;
             },
           },
@@ -269,7 +269,7 @@ const Heatmap: React.FC = () => {
         </div>
 
         <div className="text-3xl font-black text-white">{totalReaders.toLocaleString()}</div>
-        <div className="text-[10px] text-gray-400 uppercase">全球已点亮读者 ({modeLabel})</div>
+        <div className="text-[10px] text-gray-400 uppercase">全球已点亮用户 ({modeLabel})</div>
         {lastUpdate && <div className="text-[9px] text-gray-500">更新于 {lastUpdate.toLocaleTimeString()}</div>}
       </div>
 
@@ -282,7 +282,7 @@ const Heatmap: React.FC = () => {
 
       {errorMsg && (
         <div className="absolute z-20 bg-red-900/20 border border-red-500/50 p-6 rounded-xl text-center max-w-[560px]">
-          <p className="text-red-400 mb-2">回响地图加载失败</p>
+          <p className="text-red-400 mb-2">用户分布地图加载失败</p>
           <p className="text-xs text-red-300/70 font-mono break-words">{errorMsg}</p>
 
           <div className="mt-3 text-[11px] text-gray-400 text-left">

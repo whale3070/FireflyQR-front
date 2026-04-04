@@ -1,5 +1,5 @@
 import React from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import type { PublisherOutletContext } from "./PublisherAdminLayout";
 import type { BookSales } from "./PublisherAdminLayout";
 import { EXPLORER_URL } from "../config/chain";
@@ -117,10 +117,11 @@ export default function OverviewPage() {
     })) as LeaderboardItem[];
   }, [envMode, liveLeaderboard, regionRanks]);
 
-  // 点击 SKU 子合约：弹窗展示链上地址 + 链上领取记录
+  // 点击 SKU 子合约：弹窗展示链上地址 + 链上领取记录（领取地址见下方表格）
   const [detailBook, setDetailBook] = React.useState<BookSales | null>(null);
   const [detailMints, setDetailMints] = React.useState<MintRecord[]>([]);
   const [detailMintsLoading, setDetailMintsLoading] = React.useState(false);
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     if (!detailBook?.address) {
@@ -133,13 +134,16 @@ export default function OverviewPage() {
     fetch(`/api/v1/nft/contract/${encodeURIComponent(detailBook.address)}/mints?limit=100`)
       .then((res) => res.json())
       .then((data) => {
-        if (cancelled || !data?.ok) return;
-        setDetailMints(Array.isArray(data.mints) ? data.mints : []);
+        if (cancelled) return;
+        const payload = data?.data ?? data;
+        if (!payload?.ok) return;
+        setDetailMints(Array.isArray(payload.mints) ? payload.mints : []);
       })
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setDetailMintsLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -155,7 +159,7 @@ export default function OverviewPage() {
         <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
           <p className="text-indigo-700 text-xs uppercase font-semibold mb-1">Gross Sales</p>
           <p className="text-4xl font-black text-slate-900">{totalSales.toLocaleString()}</p>
-          <p className="mt-2 text-xs text-slate-600">商家口径（业务销量总计）</p>
+          <p className="mt-2 text-xs text-slate-600">商品库存</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-200">
@@ -294,7 +298,7 @@ export default function OverviewPage() {
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">商品 SKU</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase">部署者</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">链上 Mint</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">真实读者</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase">真实用户</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -380,7 +384,20 @@ export default function OverviewPage() {
               </div>
             </div>
             <div className="px-6 py-4 flex-1 overflow-auto">
-              <p className="text-xs font-semibold text-slate-600 uppercase mb-2">链上领取 NFT 记录</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase">链上领取 NFT 记录</p>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 shrink-0"
+                  onClick={() => {
+                    const addr = detailBook.address;
+                    setDetailBook(null);
+                    navigate(`/publisher-admin/nft-owners?contract=${encodeURIComponent(addr)}`);
+                  }}
+                >
+                  更多 → NFT 管理
+                </button>
+              </div>
               {detailMintsLoading ? (
                 <p className="text-sm text-slate-600">加载中…</p>
               ) : detailMints.length === 0 ? (

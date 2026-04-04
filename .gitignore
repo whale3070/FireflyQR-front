@@ -26,3 +26,17 @@ backend/whale-vault-backend
 backend/.env
 backend/env.txt
 backend/backend.log
+backend/main
+backend/Avalanche.env
+backend/back.env
+
+# NFT image assets (large binary files, served via nginx)
+public/Fluffy/
+public/antelope/
+public/bat/
+public/bat2/
+public/fox/
+public/membership/
+public/monkey/
+public/rabbit/
+public/wolf/

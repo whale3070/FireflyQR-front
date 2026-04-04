@@ -8,6 +8,8 @@ export interface MockBook {
   title: string;
   author: string;
   coverImage: string;
+  /** 子合约地址（链上 tickers 返回时用于拉 token #0 封面图） */
+  contractAddress?: string;
   currentPrice: number;
   symbol: string;
   verificationStatus: 'Verified Genuine' | 'Fake' | 'Pending';

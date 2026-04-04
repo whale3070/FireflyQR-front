@@ -4,7 +4,7 @@
 // - Force envMode = "real" (cannot enter mock)
 // - Keep existing OutletContext API for compatibility
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { useAppMode } from "../contexts/AppModeContext";
@@ -23,6 +23,8 @@ export interface BookSales {
   explorerUrl: string;
   /** 部署者地址（可选，部署时写入） */
   deployer?: string;
+  /** 后端 books 列表中的序列号（可选，下拉展示用） */
+  serial?: string;
 }
 export interface RegionRank {
   region: string;
@@ -36,8 +38,9 @@ export type PublisherOutletContext = {
   apiBaseUrl: string; // (kept for compatibility, but API calls below do NOT rely on it)
   pubAddress: string;
 
-  // balance (CFX from backend)
+  // balance (原生代币，单位由链决定：PAS/CFX/ETH 等)
   balanceCFX: number;
+  balanceSymbol: string;
   maxDeploys: number;
   balanceLoading: boolean;
   fetchPublisherBalanceData: () => Promise<void>;
@@ -75,6 +78,8 @@ export type PublisherOutletContext = {
   symbol: string;
   setSymbol: (v: string) => void;
   serial: string;
+  baseUri: string;
+  setBaseUri: (v: string) => void;
   setSerial: (v: string) => void;
   contractAddr: string | null;
   setContractAddr: (v: string | null) => void;
@@ -209,8 +214,9 @@ export default function PublisherAdminLayout() {
 
   const [pubAddress, setPubAddress] = useState<string>("");
 
-  // backend balance (CFX)
+  // backend balance（原生代币，单位由链决定）
   const [balanceCFX, setBalanceCFX] = useState<number>(0);
+  const [balanceSymbol, setBalanceSymbol] = useState<string>("CFX");
   const [maxDeploys, setMaxDeploys] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState<boolean>(false);
 
@@ -240,12 +246,26 @@ export default function PublisherAdminLayout() {
   const [author, setAuthor] = useState<string>("");
   const [symbol, setSymbol] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
+  const [baseUri, setBaseUri] = useState<string>("");
   const [contractAddr, setContractAddr] = useState<string | null>(null);
   const [count, setCount] = useState<number>(100);
 
-  // 下拉框书籍列表（real 模式）
-  const [bookListForDropdown, setBookListForDropdown] = useState<{ bookAddr: string; name?: string; symbol?: string; author?: string; serial?: string }[]>([]);
   const [bookListLoading, setBookListLoading] = useState<boolean>(false);
+
+  /** 与 bookSales 同源：仅派生形状供下拉框，避免重复请求 /api/v1/publisher/books */
+  const bookListForDropdown = useMemo(
+    () =>
+      bookSales
+        .filter((b) => isHexAddress(b.address))
+        .map((b) => ({
+          bookAddr: b.address,
+          name: b.name,
+          symbol: b.symbol,
+          author: b.author,
+          serial: b.serial,
+        })),
+    [bookSales]
+  );
 
   // search
   const [bookQuery, setBookQuery] = useState<string>("");
@@ -275,6 +295,66 @@ export default function PublisherAdminLayout() {
   const saveBooksToStorage = (books: BookSales[]) => {
     localStorage.setItem(storageKey, JSON.stringify(books));
   };
+
+  const fetchBooksFromBackend = useCallback(async (publisher: string): Promise<BookSales[]> => {
+    const p = (publisher || "").trim().toLowerCase();
+    const qs = p && isHexAddress(p) ? `publisher=${encodeURIComponent(p)}&` : "";
+    const url = `${origin()}/api/v1/publisher/books?${qs}limit=200&offset=0`;
+    const data = await fetchJsonOrThrow<{
+      ok: boolean;
+      items?: {
+        bookAddr: string;
+        name?: string;
+        symbol?: string;
+        author?: string;
+        publisher?: string;
+        serial?: string;
+      }[];
+      error?: string;
+    }>(url, { method: "GET" });
+
+    if (!data?.ok) {
+      throw new Error(data?.error || "获取商品列表失败");
+    }
+
+    const mapped = (Array.isArray(data.items) ? data.items : [])
+      .map((it) => ({
+        address: String(it?.bookAddr || "").toLowerCase(),
+        symbol: String(it?.symbol || "").toUpperCase() || "BOOK",
+        name: String(it?.name || "未命名商品"),
+        author: String(it?.author || "未知作者"),
+        sales: 0,
+        explorerUrl: "#",
+        deployer: String(it?.publisher || "").toLowerCase() || undefined,
+        serial: String(it?.serial || "").trim() || undefined,
+      }))
+      .filter((it) => isHexAddress(it.address));
+
+    // /api/v1/publisher/books 已按 createdAt DESC；前端再做一次去重兜底
+    const seen = new Set<string>();
+    const deduped = mapped.filter((it) => {
+      if (seen.has(it.address)) return false;
+      seen.add(it.address);
+      return true;
+    });
+    return deduped;
+  }, []);
+
+  /** 仅刷新书籍列表（与仪表盘拉书同源），供二维码页手动刷新 */
+  const fetchBookListForDropdown = useCallback(async () => {
+    if (envMode !== "real") return;
+    setBookListLoading(true);
+    try {
+      const publisher = (pubAddress || "").trim();
+      const books = await fetchBooksFromBackend(publisher);
+      setBookSales(books);
+      saveBooksToStorage(books);
+    } catch (e: any) {
+      showToast(e?.message || "获取书籍列表失败", "error");
+    } finally {
+      setBookListLoading(false);
+    }
+  }, [envMode, pubAddress, fetchBooksFromBackend]);
 
   // ✅ distribution (always call absolute URL) - V2 backend returns { ok, regions }
   const fetchDistribution = async () => {
@@ -354,7 +434,8 @@ export default function PublisherAdminLayout() {
       const result = await getPublisherBalance(publisher, codeHash);
       if (result.ok) {
         setBalanceCFX(parseFloat(result.balance));
-        setMaxDeploys(result.maxDeploys);
+        setBalanceSymbol(result.symbol ?? "CFX");
+        setMaxDeploys(result.maxDeploys ?? 0);
       }
       await fetchUsdtBalanceInternal(publisher, token?.address);
     } finally {
@@ -381,6 +462,7 @@ export default function PublisherAdminLayout() {
   // 进入/刷新时：读取 storage
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // 首屏先用缓存兜底，随后 fetchDashboardData 会用后端数据覆盖。
     setBookSales(loadBooksFromStorage());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -451,11 +533,11 @@ export default function PublisherAdminLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 进入/刷新时：刷新仪表盘（REAL only）
+  // 进入/刷新时、以及 pubAddress 就绪后：刷新仪表盘（含商品库存）；避免首次 mount 时 pubAddress 仍为空导致库存一直为 0
   useEffect(() => {
     fetchDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pubAddress, envMode]);
 
   // real search debounce
   useEffect(() => {
@@ -493,40 +575,32 @@ export default function PublisherAdminLayout() {
     return () => window.clearTimeout(timer);
   }, [bookQuery, envMode, pubAddress]);
 
-  const fetchBookListForDropdown = async () => {
-    if (envMode !== "real") {
-      setBookListForDropdown([]);
-      return;
-    }
-    setBookListLoading(true);
-    try {
-      const publisher = (pubAddress || "").trim().toLowerCase();
-      const qs = publisher && isHexAddress(publisher) ? `publisher=${encodeURIComponent(publisher)}&` : "";
-      const url = `${origin()}/api/v1/publisher/books?${qs}limit=200&offset=0`;
-      const data = await fetchJsonOrThrow<{ ok: boolean; items?: { bookAddr: string; name?: string; symbol?: string; author?: string; serial?: string }[] }>(url, { method: "GET" });
-      setBookListForDropdown(Array.isArray(data?.items) ? data.items : []);
-    } catch (e: any) {
-      setBookListForDropdown([]);
-      showToast(e?.message || "获取书籍列表失败", "error");
-    } finally {
-      setBookListLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (envMode === "real") {
-      fetchBookListForDropdown();
-    } else {
-      setBookListForDropdown([]);
-    }
-  }, [envMode, pubAddress]);
-
   const fetchDashboardData = async () => {
     try {
       if (envMode === "real") {
-        const realBooks = loadBooksFromStorage();
+        const publisher = (pubAddress || "").trim();
+        const realBooks = await fetchBooksFromBackend(publisher);
         setBookSales(realBooks);
-        setTotalSales(0);
+        saveBooksToStorage(realBooks);
+
+        if (isHexAddress(publisher)) {
+          try {
+            const stockRes = await fetch(
+              `${origin()}/api/v1/publisher/stock?publisher=${encodeURIComponent(publisher)}`,
+              { method: "GET" }
+            );
+            const stockJson = await stockRes.json();
+            if (stockJson?.ok && Number.isFinite(stockJson?.stock)) {
+              setTotalSales(Number(stockJson.stock));
+            } else {
+              setTotalSales(0);
+            }
+          } catch {
+            setTotalSales(0);
+          }
+        } else {
+          setTotalSales(0);
+        }
 
         const heatmapResult = await fetchDistribution();
         if (heatmapResult?.ok && Array.isArray(heatmapResult.regions)) {
@@ -614,6 +688,7 @@ export default function PublisherAdminLayout() {
           author: author || "未知作者",
           serial: serial || `SERIAL${Date.now()}`,
           publisher: isHexAddress(publisher) ? publisher : "",
+          baseUri: baseUri.trim() || undefined,
         }),
       });
 
@@ -638,9 +713,22 @@ export default function PublisherAdminLayout() {
         deployer: (pubAddress || "").trim() || undefined,
       };
 
-      const nextBooks = [newBook, ...loadBooksFromStorage()];
-      saveBooksToStorage(nextBooks);
-      setBookSales(nextBooks);
+      // 优先以后端持久化数据为准；若部署事件还未入库，则短暂展示 pending 项。
+      try {
+        const syncedBooks = await fetchBooksFromBackend(pubAddress);
+        if (result.bookAddr) {
+          setBookSales(syncedBooks);
+          saveBooksToStorage(syncedBooks);
+        } else {
+          const nextBooks = [newBook, ...syncedBooks];
+          setBookSales(nextBooks);
+          saveBooksToStorage(nextBooks);
+        }
+      } catch {
+        const nextBooks = [newBook, ...loadBooksFromStorage()];
+        saveBooksToStorage(nextBooks);
+        setBookSales(nextBooks);
+      }
 
       const feeTxHash = result.feeTxHash;
       if (feeTxHash) {
@@ -701,6 +789,24 @@ export default function PublisherAdminLayout() {
       window.URL.revokeObjectURL(dlUrl);
 
       showToast(`已生成并下载 ${n} 个二维码 ZIP`, "success");
+
+      // 立即乐观更新商品库存 +n，再请求接口以最新值为准
+      setTotalSales((prev) => prev + n);
+      const publisher = (pubAddress || "").trim();
+      if (isHexAddress(publisher)) {
+        try {
+          const stockRes = await fetch(
+            `${origin()}/api/v1/publisher/stock?publisher=${encodeURIComponent(publisher)}`,
+            { method: "GET" }
+          );
+          const stockJson = await stockRes.json();
+          if (stockJson?.ok && Number.isFinite(stockJson?.stock)) {
+            setTotalSales(Number(stockJson.stock));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (e: any) {
       const msg = (e?.message || "生成失败").toString();
       setError(msg);
@@ -724,6 +830,7 @@ export default function PublisherAdminLayout() {
     pubAddress,
 
     balanceCFX,
+    balanceSymbol,
     maxDeploys,
     balanceLoading,
     fetchPublisherBalanceData,
@@ -747,6 +854,8 @@ export default function PublisherAdminLayout() {
     setSymbol,
     serial,
     setSerial,
+    baseUri,
+    setBaseUri,
     contractAddr,
     setContractAddr,
 
@@ -818,41 +927,6 @@ export default function PublisherAdminLayout() {
               ) : null}
             </div>
 
-            <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
-              <div className="text-center">
-                <p className="text-[10px] text-emerald-600 uppercase font-medium">CFX 余额</p>
-                <p className="text-lg font-bold text-emerald-700">{balanceLoading ? "..." : balanceCFX.toFixed(2)}</p>
-              </div>
-
-              <div className="w-px h-8 bg-emerald-200"></div>
-
-              <div className="text-center">
-                <p className="text-[10px] text-sky-600 uppercase font-medium">USDT 余额</p>
-                <p className="text-lg font-bold text-sky-700">{usdtLoading ? "..." : balanceUSDT.toFixed(2)}</p>
-              </div>
-
-              <div className="w-px h-8 bg-emerald-200"></div>
-
-              <div className="text-center">
-                <p className="text-[10px] text-teal-600 uppercase font-medium">可部署次数</p>
-                <p className="text-lg font-bold text-teal-700">{balanceLoading ? "..." : maxDeploys}</p>
-              </div>
-
-              <button
-                onClick={fetchPublisherBalanceData}
-                className="ml-2 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                title="刷新余额"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </button>
-            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -885,7 +959,13 @@ export default function PublisherAdminLayout() {
                 onClick={() => navigate("/publisher-admin/topup")}
                 className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
               >
-                💳 多资产充值
+                💳 NFT押金池
+              </button>
+              <button
+                onClick={() => navigate("/publisher-admin/nft-owners")}
+                className="px-3 py-2 text-xs font-medium text-slate-800 rounded-md hover:bg-white hover:text-slate-900"
+              >
+                📋 NFT 管理
               </button>
             </div>
 

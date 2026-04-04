@@ -1,7 +1,8 @@
-// Avalanche Fuji C-Chain 配置（与后端 .env RPC_URL 一致）
+// 波卡测试网配置（与后端 .env RPC_URL 一致）
 export const CHAIN_ID = 43113
 export const RPC_URL = 'https://api.avax-test.network/ext/bc/C/rpc'
-export const EXPLORER_URL = 'https://testnet.snowtrace.io'
+// 波卡测试网区块链浏览器（商品销量排行等链上地址/交易链接）
+export const EXPLORER_URL = 'https://polkadot.testnet.routescan.io'
 export const TREASURY_ADDRESS = "0x5E8de2503881a49ed4db721E4fbAfc106C3782E6";
 export const DEPLOY_FEE_USDT = 10; // 人类单位
 // BookFactory 合约地址 (已部署)
@@ -99,6 +100,38 @@ export const FACTORY_ABI = [
 
 // ✅ USDT 合约地址（Conflux eSpace Testnet 上的那个）
 export const USDT_ADDRESS = "0x62b452bbb6a4530347002edccc742628f1431211";
+
+// Book NFT 子合约：挂售/查询挂售/二次激活（listForSale, listedForSale, buyWithPledge）
+export const BOOK_NFT_ABI = [
+  {
+    name: "listForSale",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    outputs: [],
+  },
+  {
+    name: "listedForSale",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    name: "buyWithPledge",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    outputs: [],
+  },
+  {
+    name: "pledgeAmount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
 
 // ✅ ERC20 ABI（只保留 balanceOf/decimals/symbol）
 export const ERC20_ABI = [

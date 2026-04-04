@@ -15,10 +15,12 @@ import {
   AlertCircle,
   MessageCircle,
 } from 'lucide-react';
+import { ethers } from 'ethers';
 import { useAppMode } from '../contexts/AppModeContext';
-import { EXPLORER_URL } from '../config/chain';
-import { mockDelay, MOCK_REGIONS, getRandomBook } from '../data/mockData';
+import { EXPLORER_URL, RPC_URL, BOOK_NFT_ABI } from '../config/chain';
+import { mockDelay, MOCK_REGIONS } from '../data/mockData';
 import { useApi } from '../hooks/useApi';
+import { normalizeAssetUrl, parseJsonDataUri } from '../lib/nftAssetUrl';
 
 type TxStatus = 'pending' | 'syncing' | 'success' | 'failed';
 
@@ -28,6 +30,8 @@ interface TxData {
   reader: string;
   contract: string;
   txHash: string;
+  imageUrl?: string;
+  metadataUrl?: string;
   cached?: boolean;
   blockNumber?: number | string;
   blockTimestamp?: number | string;
@@ -50,7 +54,7 @@ const Success: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
-  const { queryTransaction } = useApi();
+  const { queryTransaction, getSecondaryActivateReceiver, secondaryActivate } = useApi();
 
   const txHash = (searchParams.get('txHash') || '').trim();
 
@@ -76,8 +80,26 @@ const Success: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalMinted, setTotalMinted] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<string | null>(null);
-  const [mintedBook] = useState(getRandomBook());
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  // 售后截止日期（领取成功后按 code_hash 拉取）
+  const codeHashForApi = useMemo(() => {
+    const raw = (searchParams.get('codeHash') || searchParams.get('code_hash') || '').trim();
+    return raw.startsWith('0x') ? raw.slice(2) : raw;
+  }, [searchParams]);
+  const [deadlines, setDeadlines] = useState<{
+    free_replacement_deadline: string;
+    warranty_deadline: string;
+    claim_time?: string;
+  } | null>(null);
+  const [deadlinesLoading, setDeadlinesLoading] = useState(false);
+  const [listForSaleLoading, setListForSaleLoading] = useState(false);
+  const [listForSaleError, setListForSaleError] = useState<string | null>(null);
+  const [listForSaleTxHash, setListForSaleTxHash] = useState<string | null>(null);
+  const [listedForSale, setListedForSale] = useState<boolean | null>(null);
+  const [showResaleRuleModal, setShowResaleRuleModal] = useState(false);
+  const [nftCertificateImage, setNftCertificateImage] = useState<string>('');
+  const [nftMeta, setNftMeta] = useState<{ name: string; description: string } | null>(null);
 
   // ✅ contract fallback from URL (supports contract/book_addr/book_address)
   const contractFromUrl = useMemo(() => {
@@ -104,6 +126,67 @@ const Success: React.FC = () => {
     window.open(explorerTxUrl, '_blank', 'noopener,noreferrer');
   }, [explorerTxUrl]);
 
+  const nftImageFromUrl = useMemo(() => {
+    return pickFirst(searchParams.get('nft_image'), searchParams.get('image'), searchParams.get('image_url'));
+  }, [searchParams]);
+
+  // 二次激活：唤起钱包 → 向子合约转 1.1 PAS → 成功后后端为该钱包铸造新 NFT（无需挂售/非持有者等条件）
+  const handleListForSale = useCallback(async () => {
+    const eth = (window as unknown as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!eth) {
+      setListForSaleError('请安装 MetaMask 或其它钱包扩展后重试');
+      return;
+    }
+    setListForSaleLoading(true);
+    setListForSaleError(null);
+    setListForSaleTxHash(null);
+    try {
+      await eth.request({ method: 'eth_requestAccounts' });
+      const contractAddr = effectiveContract?.startsWith('0x') ? effectiveContract : effectiveContract ? `0x${effectiveContract}` : '';
+      if (!contractAddr || !isHexAddress(contractAddr)) {
+        setListForSaleError('缺少子合约地址，请确认交易已上链且页面已加载合约信息');
+        return;
+      }
+      const provider = new ethers.BrowserProvider(eth);
+      const signer = await provider.getSigner();
+      const walletAddr = (await signer.getAddress()).toLowerCase();
+      // 1. 从后端获取收款地址（须为当前链 EOA，否则会 missing revert data）
+      const receiverRes = await getSecondaryActivateReceiver();
+      const paymentTo = receiverRes?.ok && receiverRes?.payment_receiver && isHexAddress(receiverRes.payment_receiver)
+        ? receiverRes.payment_receiver
+        : '';
+      if (!paymentTo) {
+        setListForSaleError((receiverRes as { error?: string })?.error ?? '无法获取收款地址，请确认后端已配置 TREASURY_ADDRESS 且为当前链的 EOA');
+        return;
+      }
+      const tx = await signer.sendTransaction({
+        to: paymentTo,
+        value: ethers.parseEther('1.1'),
+        data: '0x',
+      });
+      const rec = await tx.wait();
+      const paymentHash = rec?.hash ?? tx?.hash;
+      if (!paymentHash) {
+        setListForSaleError('转账成功但未获取到交易哈希');
+        return;
+      }
+      setListForSaleTxHash(paymentHash);
+      // 2. 通知后端：校验该笔转账并为当前钱包铸造新 NFT
+      const apiRes = await secondaryActivate(contractAddr, paymentHash, walletAddr);
+      if (apiRes?.ok && apiRes?.data?.tx_hash) {
+        setListedForSale(true);
+        setListForSaleError(null);
+      } else {
+        setListForSaleError((apiRes as { error?: string })?.error ?? '后端铸造 NFT 失败');
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setListForSaleError(msg || '二次激活失败');
+    } finally {
+      setListForSaleLoading(false);
+    }
+  }, [effectiveContract, getSecondaryActivateReceiver, secondaryActivate]);
+
   // 查询交易状态
   const checkTxStatus = useCallback(async () => {
     if (!txHash) return;
@@ -121,6 +204,8 @@ const Success: React.FC = () => {
         // ✅ be tolerant to field names returned by backend
         const resolvedContract = pickFirst(d.contract, d.bookAddr, d.book_address, d.bookAddress);
         const resolvedReader = pickFirst(d.reader, userAddress);
+        const resolvedImage = pickFirst(d.imageUrl, d.image_url, d.image);
+        const resolvedMetadata = pickFirst(d.metadataUrl, d.metadata_url);
 
         setTxData({
           status: String(d.status || ''),
@@ -128,6 +213,8 @@ const Success: React.FC = () => {
           reader: resolvedReader ? resolvedReader.toLowerCase() : '',
           contract: resolvedContract ? resolvedContract.toLowerCase() : '',
           txHash: String(d.txHash || txHash),
+          imageUrl: resolvedImage,
+          metadataUrl: resolvedMetadata,
           cached: Boolean(d.cached),
           blockNumber: d.blockNumber,
           blockTimestamp: d.blockTimestamp,
@@ -136,7 +223,11 @@ const Success: React.FC = () => {
         });
 
         const upper = String(d.status || '').toUpperCase();
-        if (upper === 'SUCCESS') {
+        const hasValidContract = isHexAddress(resolvedContract);
+        const hasValidReader = isHexAddress(resolvedReader);
+        const hasTokenId = d.tokenId !== undefined && d.tokenId !== null && String(d.tokenId).trim() !== '';
+
+        if (upper === 'SUCCESS' && hasValidContract && hasValidReader && hasTokenId) {
           setTxStatus('success');
 
           // ✅ demo-only extra data (avoid "fake" numbers in real mode)
@@ -232,6 +323,143 @@ const Success: React.FC = () => {
 
   const displayTokenId =
     txData?.tokenId && txData.tokenId !== '0' ? `#${txData.tokenId}` : '#---';
+
+  // 确权成功后可选：查询当前 NFT 是否已挂售（只读）
+  useEffect(() => {
+    if (txStatus !== 'success' || !effectiveContract || !txData?.tokenId) return;
+    const addr = effectiveContract.startsWith('0x') ? effectiveContract : `0x${effectiveContract}`;
+    if (!isHexAddress(addr)) return;
+    const provider = new ethers.JsonRpcProvider(RPC_URL || '');
+    const c = new ethers.Contract(addr, BOOK_NFT_ABI as ethers.InterfaceAbi, provider);
+    c.listedForSale(txData.tokenId).then((v: boolean) => setListedForSale(v)).catch(() => {});
+  }, [txStatus, effectiveContract, txData?.tokenId]);
+
+  // 确权成功后拉取售后截止日期（免费换新 / 保修）
+  useEffect(() => {
+    if (txStatus !== 'success' || !codeHashForApi) return;
+    let cancelled = false;
+    setDeadlinesLoading(true);
+    fetch(
+      `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/sku-deadlines?code_hash=${encodeURIComponent(codeHashForApi)}`,
+      { method: 'GET' }
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !data?.ok) return;
+        setDeadlines({
+          free_replacement_deadline: data.free_replacement_deadline || '',
+          warranty_deadline: data.warranty_deadline || '',
+          claim_time: data.claim_time,
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setDeadlinesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [txStatus, codeHashForApi]);
+
+  // Resolve certificate image:
+  // 1) explicit URL param (nft_image/image/image_url)
+  // 2) on-chain tokenURI -> metadata.image
+  // 3) inline SVG fallback
+  useEffect(() => {
+    let cancelled = false;
+
+    const fallbackSvg = `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0f172a" />
+            <stop offset="100%" stop-color="#312e81" />
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="760" fill="url(#g)" />
+        <rect x="28" y="28" width="1144" height="704" rx="24" fill="none" stroke="#94a3b8" stroke-opacity="0.4" stroke-width="2" />
+        <text x="80" y="130" fill="#a5b4fc" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">WHALE VAULT</text>
+        <text x="80" y="220" fill="#ffffff" font-family="Arial, sans-serif" font-size="64" font-weight="700">NFT CERTIFICATE</text>
+        <text x="80" y="300" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="28">Token ${displayTokenId}</text>
+        <text x="80" y="360" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="20">Owner: ${(txData?.reader || userAddress || 'N/A').slice(0, 16)}...</text>
+        <text x="80" y="405" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="20">Contract: ${effectiveContract ? effectiveContract.slice(0, 16) : 'N/A'}...</text>
+        <text x="80" y="660" fill="#94a3b8" font-family="Arial, sans-serif" font-size="18">On-chain proof. Tamper-resistant.</text>
+      </svg>`
+    )}`;
+
+    const resolveImage = async () => {
+      if (txStatus !== 'success') {
+        setNftCertificateImage('');
+        setNftMeta(null);
+        return;
+      }
+
+      if (nftImageFromUrl) {
+        setNftMeta(null);
+        setNftCertificateImage(normalizeAssetUrl(nftImageFromUrl));
+        return;
+      }
+
+      if (txData?.imageUrl) {
+        setNftMeta(null);
+        setNftCertificateImage(normalizeAssetUrl(txData.imageUrl));
+        return;
+      }
+
+      const tokenIdRaw = txData?.tokenId;
+      if (!effectiveContract || tokenIdRaw === undefined || tokenIdRaw === null || String(tokenIdRaw).trim() === '' || !isHexAddress(effectiveContract)) {
+        setNftMeta(null);
+        setNftCertificateImage(fallbackSvg);
+        return;
+      }
+
+      try {
+        const provider = new ethers.JsonRpcProvider(RPC_URL || '');
+        const c = new ethers.Contract(effectiveContract, BOOK_NFT_ABI as ethers.InterfaceAbi, provider);
+        const tokenUri: string = await c.tokenURI(tokenIdRaw);
+        if (cancelled) return;
+        if (!tokenUri) {
+          setNftMeta(null);
+          setNftCertificateImage(fallbackSvg);
+          return;
+        }
+
+        let meta: Record<string, unknown> | null = null;
+        const inlineMeta = parseJsonDataUri(tokenUri);
+        if (inlineMeta) {
+          meta = inlineMeta;
+        } else {
+          const metaUrl = normalizeAssetUrl(tokenUri);
+          const resp = await fetch(metaUrl, { method: 'GET' });
+          if (resp.ok) {
+            meta = (await resp.json()) as Record<string, unknown>;
+          }
+        }
+        if (cancelled) return;
+
+        const name = typeof meta?.name === 'string' ? meta.name : '';
+        const description = typeof meta?.description === 'string' ? meta.description : '';
+        if (name || description) {
+          setNftMeta({ name, description });
+        } else {
+          setNftMeta(null);
+        }
+
+        const img = normalizeAssetUrl(String(meta?.image ?? meta?.image_url ?? ''));
+        setNftCertificateImage(img || fallbackSvg);
+      } catch {
+        if (!cancelled) {
+          setNftMeta(null);
+          setNftCertificateImage(fallbackSvg);
+        }
+      }
+    };
+
+    resolveImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [txStatus, nftImageFromUrl, txData?.imageUrl, txData?.tokenId, txData?.reader, userAddress, effectiveContract, displayTokenId]);
 
   // ---------- Pending / Syncing (RWA 防二次灌装) ----------
   if (txStatus === 'pending' || txStatus === 'syncing') {
@@ -354,286 +582,277 @@ const Success: React.FC = () => {
 
   // ---------- Success (RWA 防二次灌装) ----------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-8 px-4">
-      <div className="max-w-md w-full space-y-6">
-        {/* RWA 防二次灌装 品牌条 */}
-        <div className="text-center py-2">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">RWA 防二次灌装 · 正品确权</p>
-        </div>
-
-        {/* 恭喜获得红包 - 主提示 */}
-        <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-6 text-center shadow-lg border border-amber-300">
-          <p className="text-amber-900/90 text-sm font-medium mb-2">恭喜你，获得红包</p>
-          <p className="text-3xl font-black text-white">0.1 USDT</p>
-          <p className="text-amber-100 text-xs mt-2">本码已核销，防二次灌装</p>
-        </div>
-
-        <div className="text-center space-y-3">
-          <div className="flex justify-center relative">
-            <CheckCircle className="w-14 h-14 text-emerald-500" />
-            <ShieldCheck className="w-5 h-5 text-white bg-emerald-500 rounded-full absolute bottom-0 right-1/2 translate-x-8 border-2 border-slate-50" />
-          </div>
-          <h2 className="text-xl font-black text-slate-800">确权成功</h2>
-          <p className="text-slate-500 text-xs">NFT 存证已上链，不可篡改</p>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-soft">
-          <img
-            src={mintedBook.coverImage}
-            alt={mintedBook.title}
-            className="w-16 h-24 object-cover rounded-lg"
-            onError={(e) => {
-              e.currentTarget.src = 'https://placehold.co/100x150/e2e8f0/6366f1?text=NFT';
-            }}
-          />
-          <div>
-            <p className="text-slate-800 font-bold">{mintedBook.title}</p>
-            <p className="text-xs text-slate-400">{mintedBook.author}</p>
-            <div
-              className={`mt-2 inline-block px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                mintedBook.verificationStatus === 'Verified Genuine'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-red-100 text-red-600'
-              }`}
-            >
-              {mintedBook.verificationStatus}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col items-center py-6 px-4">
+      <div className="w-full max-w-4xl">
+        {/* 顶部：品牌 + 确权成功 */}
+        <header className="text-center mb-8">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">RWA 防二次灌装 · 正品确权</p>
+          <div className="flex justify-center items-center gap-4 mt-4">
+            <div className="flex justify-center relative">
+              <CheckCircle className="w-12 h-12 text-emerald-500" />
+              <ShieldCheck className="w-5 h-5 text-white bg-emerald-500 rounded-full absolute -bottom-0.5 -right-1 border-2 border-white" />
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">确权成功</h1>
+              <p className="text-slate-500 text-sm">NFT 存证已上链，不可篡改</p>
             </div>
           </div>
-        </div>
+        </header>
 
-        {totalMinted !== null && (
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-3xl p-6 text-center space-y-3">
-            <p className="text-xs text-indigo-600 uppercase font-semibold tracking-widest">🎉 恭喜你成为</p>
-            <p className="text-5xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              第 {totalMinted} 位
-            </p>
-            <p className="text-slate-500 text-xs">全球领取此书 NFT 存证的读者</p>
-            {userLocation && (
-              <div className="flex items-center justify-center gap-2 mt-2 text-emerald-600">
-                <MapPin className="w-4 h-4" />
-                <span className="text-sm font-medium">{userLocation} 已点亮 !</span>
+        {/* 主内容：两栏（大屏） */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* 左栏：勋章存证 + 二次激活 */}
+          <div className="space-y-4">
+            <section className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">勋章存证</span>
+                <span className="text-[10px] text-emerald-600 font-semibold uppercase">Verified</span>
               </div>
-            )}
-          </div>
-        )}
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-soft">
-          <div className="flex justify-between items-end border-b border-slate-100 pb-4">
-            <div>
-              <span className="text-xs text-slate-400 uppercase font-semibold">勋章编号</span>
-              <p className="text-xl font-black text-indigo-600">{displayTokenId}</p>
-            </div>
-            <p className="text-xs text-emerald-600 font-semibold uppercase">Verified</p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-xs text-slate-400 uppercase font-semibold">绑定地址</span>
-            <p className="text-xs text-slate-500 font-mono break-all">
-              {txData?.reader || userAddress || '—'}
-            </p>
-          </div>
-
-          {effectiveContract && (
-            <div className="space-y-1">
-              <span className="text-xs text-slate-400 uppercase font-semibold">合约地址</span>
-              <p className="text-xs text-slate-500 font-mono break-all">{effectiveContract}</p>
-              {!isHexAddress(effectiveContract) && (
-                <p className="text-[10px] text-amber-600">⚠️ 合约地址格式看起来不正确，faucet 插件不会加载。</p>
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 mb-4">
+                <img
+                  src={nftCertificateImage || ''}
+                  alt={nftMeta?.name || 'NFT certificate'}
+                  className="w-full h-52 object-cover"
+                />
+              </div>
+              {(nftMeta?.name || nftMeta?.description) && (
+                <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                  {nftMeta.name ? (
+                    <p className="text-sm font-bold text-slate-900 leading-snug">{nftMeta.name}</p>
+                  ) : null}
+                  {nftMeta.description ? (
+                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed line-clamp-5">{nftMeta.description}</p>
+                  ) : null}
+                </div>
               )}
-            </div>
-          )}
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-0.5">Token</p>
+                  <p className="text-indigo-600 font-bold text-base">{displayTokenId}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-0.5">绑定地址</p>
+                  <p className="text-slate-600 font-mono break-all text-xs">{txData?.reader || userAddress || '—'}</p>
+                </div>
+                {effectiveContract && (
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase font-medium mb-0.5">合约地址</p>
+                    <p className="text-slate-600 font-mono break-all text-xs">{effectiveContract}</p>
+                    {!isHexAddress(effectiveContract) && (
+                      <p className="text-[10px] text-amber-600 mt-1">⚠️ 合约地址格式异常</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {txData?.cached && (
+                <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded mt-3 inline-block">⚡ 缓存数据</p>
+              )}
+            </section>
 
-          {txData?.cached && (
-            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">⚡ 缓存数据</div>
-          )}
-        </div>
+            {txStatus === 'success' && effectiveContract && (
+              <section className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setShowResaleRuleModal(true)}
+                  className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 hover:text-indigo-600 transition-colors cursor-pointer text-left"
+                >
+                  二手流转
+                </button>
+                {listedForSale === true ? (
+                  <div className="flex items-center gap-2 text-emerald-600">
+                    <CheckCircle className="w-5 h-5 shrink-0" />
+                    <span className="text-sm font-semibold">该 NFT 已二次激活，新 NFT 已铸造至您的钱包</span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={listForSaleLoading}
+                      onClick={handleListForSale}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold text-sm"
+                    >
+                      {listForSaleLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> 二次激活中…</>
+                      ) : (
+                        '二次激活NFT'
+                      )}
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-1.5">连接钱包后向子合约转账 1.1 PAS，成功后将为您铸造新 NFT</p>
+                  </>
+                )}
+                {listForSaleError && <p className="mt-1.5 text-xs text-red-600">{listForSaleError}</p>}
+                {listForSaleTxHash && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`${EXPLORER_URL}/tx/${listForSaleTxHash}`, '_blank')}
+                    className="mt-1.5 text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    查看二次激活交易 <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </section>
+            )}
 
-        {/* 链上交易详情（确认成功后回显） */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">链上交易详情</p>
-          <dl className="grid gap-2 text-sm">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <dt className="text-slate-500 shrink-0">Transaction Hash:</dt>
-              <dd className="font-mono text-slate-800 break-all">{txHash || '—'}</dd>
-            </div>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <dt className="text-slate-500 shrink-0">Status:</dt>
-              <dd className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Success
-              </dd>
-            </div>
-            {txData?.blockNumber != null && (
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500 shrink-0">Block:</dt>
-                <dd className="font-mono text-slate-800">{String(txData.blockNumber)}</dd>
+            {/* 二手流转说明弹框 */}
+            {showResaleRuleModal && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                onClick={() => setShowResaleRuleModal(false)}
+              >
+                <div
+                  className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-6"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    当转账押金 X+1 元金额后，即可二次激活 NFT，上一任用户的押金 X 元可以申请退还。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowResaleRuleModal(false)}
+                    className="mt-4 w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm hover:bg-slate-200 transition-colors"
+                  >
+                    知道了
+                  </button>
+                </div>
               </div>
             )}
-            {txData?.blockTimestamp != null && (
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500 shrink-0">Timestamp:</dt>
-                <dd className="text-slate-800">
-                  {new Date(Number(txData.blockTimestamp) * 1000).toLocaleString('zh-CN', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}{' '}
-                  (UTC)
-                </dd>
-              </div>
-            )}
-            {txData?.from && (
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500 shrink-0">From:</dt>
-                <dd className="font-mono text-slate-800 break-all">{txData.from}</dd>
-              </div>
-            )}
-            {txData?.to && (
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500 shrink-0">To:</dt>
-                <dd className="font-mono text-slate-800 break-all">{txData.to}</dd>
-              </div>
-            )}
-            {effectiveContract && (
-              <div className="flex flex-wrap items-baseline gap-2">
-                <dt className="text-slate-500 shrink-0">Created:</dt>
-                <dd className="font-mono text-slate-800 break-all">{effectiveContract}</dd>
-              </div>
-            )}
-          </dl>
-          {explorerTxUrl && (
-            <button
-              type="button"
-              onClick={openTxInExplorer}
-              className="mt-2 flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-indigo-100 text-indigo-700 text-sm font-medium hover:bg-indigo-200"
-            >
-              <ExternalLink className="w-4 h-4" />
-              在区块浏览器中查看
-            </button>
-          )}
-        </div>
-
-        {/* 红包信息 */}
-        {redPacketInfo.rewardAmount > 0 && (
-          <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-3xl p-6 space-y-4 shadow-soft">
-            <div className="text-center space-y-2">
-              <span className="text-3xl">🧧</span>
-              <h3 className="text-lg font-bold text-red-600">红包领取成功</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-white rounded-2xl p-4 border border-red-100">
-                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">红包金额</p>
-                <p className="text-2xl font-black text-red-500">¥{redPacketInfo.rewardAmount.toFixed(2)}</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-red-100">
-                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">扫码次数</p>
-                <p className="text-2xl font-black text-orange-500">第 {redPacketInfo.scanCount} 次</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <MapPin className="w-4 h-4 text-red-400" />
-                <span>{redPacketInfo.location}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <Clock className="w-4 h-4 text-red-400" />
-                <span>{redPacketInfo.firstScanTime || '刚刚'}</span>
-              </div>
-            </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 gap-3">
-          <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest text-center mb-1">
-            下一步行动计划
-          </p>
+          {/* 右栏：售后保障 + 第 N 位 + 红包 */}
+          <div className="space-y-4">
+            <section className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center mb-3">售后保障</p>
+              <div className="flex items-center justify-center gap-4">
+                <div className="hourglass-wrap flex-shrink-0" style={{ width: 48, height: 60 }}>
+                  <svg width="48" height="60" viewBox="0 0 64 80" className="text-amber-500 w-full h-full" fill="currentColor" aria-hidden>
+                    <path d="M32 4 L60 40 L32 76 L4 40 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M4 40 L32 40 L60 40" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+                    <path d="M8 36 L28 8 L32 4 L36 8 L56 36" fill="currentColor" opacity="0.9" className="hourglass-sand-top" />
+                    <path d="M8 44 L28 72 L32 76 L36 72 L56 44" fill="currentColor" opacity="0.25" className="hourglass-sand-bottom" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  {deadlinesLoading && <p className="text-xs text-slate-400">加载中…</p>}
+                  {!deadlinesLoading && deadlines && (deadlines.free_replacement_deadline || deadlines.warranty_deadline) && (
+                    <div className="space-y-1.5 text-sm">
+                      {deadlines.free_replacement_deadline && (
+                        <div>
+                          <p className="text-[10px] text-slate-400">免费换新截止</p>
+                          <p className="font-semibold text-slate-800">{deadlines.free_replacement_deadline}</p>
+                        </div>
+                      )}
+                      {deadlines.warranty_deadline && (
+                        <div>
+                          <p className="text-[10px] text-slate-400">保修截止</p>
+                          <p className="font-semibold text-slate-800">{deadlines.warranty_deadline}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!deadlinesLoading && (!deadlines || (!deadlines.free_replacement_deadline && !deadlines.warranty_deadline)) && codeHashForApi && (
+                    <p className="text-xs text-slate-400">暂无该码的售后期限</p>
+                  )}
+                </div>
+              </div>
+            </section>
 
-          <button
-            onClick={() => navigate('/Heatmap')}
-            className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl hover:from-indigo-100 hover:to-purple-100 transition-all group text-left"
-          >
-            <div className="bg-indigo-100 p-3 rounded-xl">
-              <Globe className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-800">查看全球读者热力图</h4>
-              <p className="text-xs text-indigo-600">你的地区已被点亮！</p>
-            </div>
-          </button>
+            {totalMinted !== null && (
+              <section className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
+                <p className="text-[10px] text-indigo-600 uppercase font-semibold tracking-wider mb-1">🎉 恭喜你成为</p>
+                <p className="text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  第 {totalMinted} 位
+                </p>
+                <p className="text-slate-500 text-xs mt-0.5">全球领取此书 NFT 存证的读者</p>
+                {userLocation && (
+                  <div className="flex items-center gap-1.5 mt-2 text-emerald-600 text-sm">
+                    <MapPin className="w-4 h-4" />
+                    <span>{userLocation} 已点亮</span>
+                  </div>
+                )}
+              </section>
+            )}
 
-          <button
-            onClick={() => navigate('/reward')}
-            className="flex items-center gap-4 bg-white border border-slate-200 p-4 rounded-2xl hover:bg-slate-50 transition-all group text-left"
-          >
-            <div className="bg-emerald-100 p-3 rounded-xl">
-              <Users className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-800">推荐 5 位新用户</h4>
-              <p className="text-xs text-slate-500">邀请好友激活，赚取节点分成收益</p>
-            </div>
-          </button>
-
-          <a
-            href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left"
-          >
-            <div className="bg-pink-100 p-3 rounded-xl">
-              <MessageCircle className="w-5 h-5 text-pink-600" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-800">加入读者俱乐部</h4>
-              <p className="text-xs text-pink-600">和作者、其他读者一起在线分享读书感想</p>
-            </div>
-          </a>
-
-          <button
-            onClick={() => navigate('/bookshelf')}
-            className="flex items-center gap-4 bg-gradient-to-r from-indigo-500 to-purple-500 p-4 rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all group text-left shadow-md"
-          >
-            <div className="bg-white/20 p-3 rounded-xl">
-              <LineChart className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">进入&quot;终焉大盘系统&quot;</h4>
-              <p className="text-xs text-white/80">预判销量第一的爆款书籍</p>
-            </div>
-          </button>
+            {redPacketInfo.rewardAmount > 0 && (
+              <section className="bg-gradient-to-br from-red-50 to-orange-50 border border-red-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">🧧</span>
+                  <h3 className="text-base font-bold text-red-600">红包领取成功</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/80 rounded-xl p-3 border border-red-100">
+                    <p className="text-[10px] text-slate-500 uppercase">红包金额</p>
+                    <p className="text-xl font-black text-red-500">¥{redPacketInfo.rewardAmount.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-3 border border-red-100">
+                    <p className="text-[10px] text-slate-500 uppercase">扫码次数</p>
+                    <p className="text-xl font-black text-orange-500">第 {redPacketInfo.scanCount} 次</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-600">
+                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-red-400" />{redPacketInfo.location}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-red-400" />{redPacketInfo.firstScanTime || '刚刚'}</span>
+                </div>
+              </section>
+            )}
+          </div>
         </div>
 
-        <div className="pt-4 text-center space-x-4">
+        {/* 下一步：四宫格 */}
+        <section className="mb-8">
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center mb-3">下一步</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button
+              onClick={() => navigate('/Heatmap')}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-indigo-200 hover:shadow transition-all text-center"
+            >
+              <div className="bg-indigo-100 p-2.5 rounded-xl"><Globe className="w-5 h-5 text-indigo-600" /></div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">全球热力图</span>
+            </button>
+            <button
+              onClick={() => navigate('/reward')}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-emerald-200 hover:shadow transition-all text-center"
+            >
+              <div className="bg-emerald-100 p-2.5 rounded-xl"><Users className="w-5 h-5 text-emerald-600" /></div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">推荐新用户</span>
+            </button>
+            <a
+              href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-pink-200 hover:shadow transition-all text-center"
+            >
+              <div className="bg-pink-100 p-2.5 rounded-xl"><MessageCircle className="w-5 h-5 text-pink-600" /></div>
+              <span className="text-xs font-bold text-slate-800 leading-tight">官方售后群</span>
+            </a>
+            <button
+              onClick={() => navigate('/bookshelf')}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-indigo-500 border border-indigo-600 shadow-sm hover:bg-indigo-600 transition-all text-center"
+            >
+              <div className="bg-white/20 p-2.5 rounded-xl"><LineChart className="w-5 h-5 text-white" /></div>
+              <span className="text-xs font-bold text-white leading-tight">商家与销量</span>
+            </button>
+          </div>
+        </section>
+
+        {/* 底部操作 + 品牌 */}
+        <footer className="flex flex-wrap items-center justify-center gap-4 py-4 border-t border-slate-200/60">
           {txHash && (
             <button
               onClick={checkTxStatus}
               disabled={isRefreshing}
-              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50"
+              className="text-xs text-slate-500 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              {isRefreshing ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  查询中...
-                </>
-              ) : (
-                <>
-                  刷新交易状态 <RefreshCw className="w-3 h-3" />
-                </>
-              )}
+              {isRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              刷新状态
             </button>
           )}
-
           {explorerTxUrl && (
-            <button
-              onClick={openTxInExplorer}
-              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest"
-            >
-              链上哈希核验 <ExternalLink className="w-3 h-3" />
+            <button onClick={openTxInExplorer} className="text-xs text-slate-500 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5">
+              <ExternalLink className="w-3.5 h-3.5" /> 链上核验
             </button>
           )}
-        </div>
-
-        <p className="text-center text-xs text-slate-400 uppercase tracking-widest pt-4">
-          RWA 防二次灌装 · No Refill
-        </p>
+          <span className="text-[10px] text-slate-400 uppercase tracking-widest">RWA 防二次灌装 · No Refill</span>
+        </footer>
       </div>
     </div>
   );

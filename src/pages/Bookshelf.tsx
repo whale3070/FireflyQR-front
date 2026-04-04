@@ -7,6 +7,7 @@ import { useApi } from '../hooks/useApi';
 import { MOCK_BOOKS, MockBook } from '../data/mockData';
 import { ScanVerifyModal } from '../components/ScanVerifyModal';
 import { BettingModal } from '../components/BettingModal';
+import { BookNftCover } from '../components/BookNftCover';
 import { ToastContainer } from '../components/ui/CyberpunkToast';
 
 // 语言选项配置
@@ -227,9 +228,17 @@ export default function Bookshelf() {
                   onClick={() => handleBookClick(book)}
                 >
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 font-semibold text-sm border border-indigo-100">
-                      {book.symbol}
-                    </span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BookNftCover
+                        contractAddress={book.contractAddress}
+                        fallbackSrc={book.coverImage}
+                        alt={book.title}
+                        className="w-14 h-14 rounded-lg object-cover border border-slate-200 shrink-0 bg-slate-100"
+                      />
+                      <span className="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 font-semibold text-sm border border-indigo-100">
+                        {book.symbol}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-semibold text-slate-800">{book.title}</div>

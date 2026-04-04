@@ -1,31 +1,25 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
-import "./QuickNFT.sol";
+import {QuickNFT} from "./QuickNFT.sol";
 
-/**
- * @title BookFactory
- * @dev 工厂合约 - 出版社通过此合约部署新书的 NFT 合约
- */
+/// @title BookFactory
+/// @dev 出版社通过工厂部署 QuickNFT；部署时传入 baseURI（须以 / 结尾，见 NFT-ASSETS.md）
 contract BookFactory {
-    // 收款地址（平台方）
-    address public treasury; [cite: 16]
-    // 部署费用（单位：Wei）
-    uint256 public deployFee; [cite: 17]
-    
-    // 所有已部署的书籍合约
-    address[] public deployedBooks; [cite: 17]
-    // 出版社地址 => 其部署的书籍合约列表
-    mapping(address => address[]) public publisherBooks; [cite: 18]
+    address public treasury;
+    uint256 public deployFee;
+
+    address[] public deployedBooks;
+    mapping(address => address[]) public publisherBooks;
 
     struct BookInfo {
-        string name; [cite: 19]
-        string symbol; [cite: 20]
-        string author; [cite: 20]
-        address publisher; [cite: 20]
-        uint256 deployedAt; [cite: 20]
+        string name;
+        string symbol;
+        string author;
+        address publisher;
+        uint256 deployedAt;
     }
-    mapping(address => BookInfo) public bookInfo; [cite: 20]
+    mapping(address => BookInfo) public bookInfo;
 
     event BookDeployed(
         address indexed bookContract,
@@ -33,88 +27,83 @@ contract BookFactory {
         string name,
         string symbol,
         string author
-    ); [cite: 21]
-    event DeployFeeUpdated(uint256 oldFee, uint256 newFee); [cite: 22]
-    event TreasuryUpdated(address oldTreasury, address newTreasury); [cite: 22]
+    );
+    event DeployFeeUpdated(uint256 oldFee, uint256 newFee);
+    event TreasuryUpdated(address oldTreasury, address newTreasury);
 
     constructor(address _treasury, uint256 _deployFee) {
-        require(_treasury != address(0), "Invalid treasury address"); [cite: 23]
-        treasury = _treasury; [cite: 24]
-        deployFee = _deployFee; [cite: 24]
+        require(_treasury != address(0), "Invalid treasury address");
+        treasury = _treasury;
+        deployFee = _deployFee;
     }
 
-    /**
-     * @dev 部署新书 NFT 合约
-     */
     function deployBook(
         string memory bookName,
         string memory symbol,
         string memory authorName,
         string memory baseURI,
-        address relayer
+        address relayer,
+        uint256 pledgeAmount
     ) external payable returns (address) {
-        require(msg.value >= deployFee, "Insufficient deploy fee"); [cite: 25]
-        require(bytes(bookName).length > 0, "Book name required"); [cite: 26]
-        require(bytes(symbol).length > 0, "Symbol required"); [cite: 26]
+        require(msg.value >= deployFee, "Insufficient deploy fee");
+        require(bytes(bookName).length > 0, "Book name required");
+        require(bytes(symbol).length > 0, "Symbol required");
 
-        // 【关键修改】直接在部署时传入 relayer 参数
-        // 这样 QuickNFT 可以在构造函数里直接完成授权，不需要工厂后续调用
         QuickNFT newBook = new QuickNFT(
             bookName,
             symbol,
             authorName,
-            msg.sender, // 出版社
+            msg.sender,
             baseURI,
-            relayer     // 新增参数
-        ); [cite: 27]
+            relayer,
+            pledgeAmount
+        );
 
-        address bookAddress = address(newBook); [cite: 28]
-        
-        // 记录书籍信息
-        deployedBooks.push(bookAddress); [cite: 29]
-        publisherBooks[msg.sender].push(bookAddress); [cite: 30]
+        address bookAddress = address(newBook);
+
+        deployedBooks.push(bookAddress);
+        publisherBooks[msg.sender].push(bookAddress);
         bookInfo[bookAddress] = BookInfo({
             name: bookName,
             symbol: symbol,
             author: authorName,
             publisher: msg.sender,
             deployedAt: block.timestamp
-        }); [cite: 30]
+        });
 
-        // 转账给平台
         if (msg.value > 0) {
-            (bool success, ) = payable(treasury).call{value: msg.value}(""); [cite: 31]
-            require(success, "Transfer failed"); [cite: 32]
+            (bool success, ) = payable(treasury).call{value: msg.value}("");
+            require(success, "Transfer failed");
         }
-        
-        emit BookDeployed(bookAddress, msg.sender, bookName, symbol, authorName); [cite: 32]
-        return bookAddress; [cite: 33]
+
+        emit BookDeployed(bookAddress, msg.sender, bookName, symbol, authorName);
+        return bookAddress;
     }
 
     function totalBooks() external view returns (uint256) {
-        return deployedBooks.length; [cite: 33]
+        return deployedBooks.length;
     }
 
     function getPublisherBooks(address publisher) external view returns (address[] memory) {
-        return publisherBooks[publisher]; [cite: 34]
+        return publisherBooks[publisher];
     }
 
     function getBookSales(address bookContract) external view returns (uint256) {
-        return QuickNFT(bookContract).totalSales(); [cite: 35]
+        return QuickNFT(payable(bookContract)).totalSales();
     }
 
     function updateDeployFee(uint256 newFee) external {
-        require(msg.sender == treasury, "Only treasury"); [cite: 36]
-        emit DeployFeeUpdated(deployFee, newFee); [cite: 37]
-        deployFee = newFee; [cite: 37]
+        require(msg.sender == treasury, "Only treasury");
+        emit DeployFeeUpdated(deployFee, newFee);
+        deployFee = newFee;
     }
 
     function updateTreasury(address newTreasury) external {
-        require(msg.sender == treasury, "Only treasury"); [cite: 37]
-        require(newTreasury != address(0), "Invalid address"); [cite: 38]
-        emit TreasuryUpdated(treasury, newTreasury); [cite: 38]
-        treasury = newTreasury; [cite: 39]
+        require(msg.sender == treasury, "Only treasury");
+        require(newTreasury != address(0), "Invalid address");
+        emit TreasuryUpdated(treasury, newTreasury);
+        treasury = newTreasury;
     }
 
-    receive() external payable {} [cite: 39]
+    receive() external payable {}
 }
