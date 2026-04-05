@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Whale Vault — Verifiable Sales Tracking on Conflux</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Whale Vault: Real-world action → On-chain proof → Automated settlement. A verifiable sales tracking system built on Conflux eSpace." />
-  <meta name="theme-color" content="#0f172a" />
+<!-- saved from url=(0036)http://whale3070.com/pitch-deck.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <title>FireflyQR — Gasless NFT Checkout for Revive &amp; Polkadot 2.0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FireflyQR: Gasless NFT checkout for real-world goods. On-chain real sales, NFT, and user data as proof for investors and banks. Built on Revive and Polkadot 2.0.">
+  <meta name="theme-color" content="#0f172a">
 
   <!-- Open Graph (for sharing) -->
-  <meta property="og:title" content="Whale Vault — Verifiable Sales Tracking on Conflux" />
-  <meta property="og:description" content="Real-world action → On-chain proof → Automated settlement." />
-  <meta property="og:type" content="website" />
+  <meta property="og:title" content="FireflyQR — Gasless NFT Checkout for Revive &amp; Polkadot 2.0">
+  <meta property="og:description" content="On-chain real sales, NFT, and user data → collateral for investors and banks. Borrow and repay on demand. Ease SME financing and trade funding gaps.">
+  <meta property="og:type" content="website">
 
   <style>
     :root{
@@ -60,18 +60,11 @@
       letter-spacing:-0.4px;
     }
 
-    /* bilingual text blocks */
     .b{ max-width: 1040px; margin: 10px 0; }
     .en{
       font-size:18px;
       color:var(--muted);
       margin:0;
-    }
-    .zh{
-      font-size:16px;
-      color:var(--muted2);
-      margin:6px 0 0 0;
-      letter-spacing:0.2px;
     }
     .em{ color:#fff; font-weight:800; }
     code{
@@ -202,12 +195,20 @@
     }
     .cta:hover{ background:rgba(96,165,250,0.22); text-decoration:none; }
 
-    video{
+    .videoEmbed{
       width:100%;
+      max-width:640px;
+      aspect-ratio:16/9;
       border-radius:14px;
       border:1px solid var(--line);
       margin-top:12px;
+      overflow:hidden;
       background:#000;
+    }
+    .videoEmbed iframe{
+      width:100%;
+      height:100%;
+      border:none;
     }
 
     .footer{
@@ -217,206 +218,486 @@
       max-width:1040px;
     }
 
-    /* tiny helper to keep bilingual blocks visually grouped */
+    .elevator{
+      max-width:1040px;
+      margin:14px 0 0 0;
+      padding:14px 18px;
+      background:rgba(96,165,250,0.08);
+      border:1px solid rgba(96,165,250,0.25);
+      border-radius:12px;
+    }
+    .elevator .line{ margin:4px 0; font-size:16px; color:var(--muted); }
+    .elevator .line strong{ color:#fff; }
+
     .sep{ height: 6px; }
+
+    /* 新增6格漫画卡片样式 */
+    .comic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+      max-width: 1040px;
+    }
+
+    .comic-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .comic-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.4);
+      border-color: var(--link);
+    }
+
+    .comic-card-img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .comic-card-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.9;
+      transition: opacity 0.2s ease;
+    }
+
+    .comic-card:hover .comic-card-img img {
+      opacity: 1;
+    }
+
+    .comic-card-content {
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .comic-card-badge {
+      font-size: 11px;
+      color: var(--chipText);
+      background: rgba(147, 197, 253, 0.1);
+      border-radius: 6px;
+      padding: 2px 8px;
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+
+    .comic-card-title {
+      font-size: 14px;
+      color: #fff;
+      font-weight: 600;
+      margin: 0 0 4px 0;
+      line-height: 1.4;
+    }
+
+    .comic-card-desc {
+      font-size: 12px;
+      color: var(--muted2);
+      margin: 0;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    /* 响应式适配 */
+    @media (max-width: 768px) {
+      .comic-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .comic-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
 
 <!-- PAGE 1 -->
 <section>
-  <h1>Whale Vault</h1>
+  <h1>FireflyQR</h1>
 
   <div class="b">
-    <p class="en"><span class="em">Verifiable Sales Tracking</span> for cross-border distribution — we record <span class="em">real-world actions</span> as they happen, not self‑reported numbers.</p>
-    <p class="zh">面向跨境分销的<span class="em">可验证销量追踪</span>系统——把<span class="em">真实发生的扫码/兑换行为</span>实时记录下来，而不是依赖渠道自报数据。</p>
+    <p class="en"><span class="em">Gasless NFT checkout</span> for real-world goods — scan, claim, unlock. Built for cross-border merchants and the <span class="em">Polkadot 2.0</span> ecosystem.</p>
   </div>
 
-  <div class="pill"><span class="dot"></span> LIVE on Conflux eSpace · 可现场演示（运行中）</div>
+  <div class="elevator">
+    <p class="line"><strong>Problem:</strong> Cross-border and second-hand trust can’t be solved by a central database; SMEs lack verifiable proof for financing; platforms monopolize distribution.</p>
+    <p class="line"><strong>Solution:</strong> One code per item → on-chain NFT + scan IP (salted) → one immutable data layer for anti-counterfeiting, anti-diversion, financing, and direct consumer reach.</p>
+    <p class="line"><strong>Why us:</strong> MVP live; QR anti-copy design (unseal to see, claim starts countdown); all-goods-on-chain, one build for bank / insurance / lending.</p>
+  </div>
+
+  <div class="pill"><span class="dot"></span> Deploy on Revive · Scale on Polkadot 2.0 — Original DApp Development</div>
 
   <div class="card">
-    <div class="title"><b>Problem / 问题</b></div>
+    <div class="title"><b>Why On-Chain</b></div>
 
     <div class="b">
       <p class="en">
-        In cross-border distribution, sales and usage data is often opaque, delayed, or manipulated.
-        Brands and publishers cannot reliably verify <span class="em">where</span>, <span class="em">when</span>, and <span class="em">how</span> products were actually sold or redeemed.
-      </p>
-      <p class="zh">
-        在跨境分销中，销量与使用数据往往<span class="em">不透明</span>、<span class="em">延迟</span>或<span class="em">可被篡改</span>。
-        品牌与出版社无法可靠验证产品<span class="em">在哪里</span>、<span class="em">什么时候</span>、以及<span class="em">如何</span>被实际售出或兑换。
+        For long-lifecycle goods (notebooks, phones, luxury items), traditional databases fail: data can be altered, companies can shut down, and traceability becomes meaningless. <span class="em">On-chain data never disappears</span>. Every mint, transfer, and secondary activation is verifiable, permanent, and traceable to the original issuer.
       </p>
     </div>
 
     <ul class="badlist">
-      <li><span class="bad">❌</span><span>Channel reports are not trustworthy (no audit trail) / 渠道报告不可验证（缺少审计追踪）</span></li>
-      <li><span class="bad">❌</span><span>Reconciliation is slow and manual across platforms/countries / 跨平台、跨国家对账慢且依赖人工</span></li>
-      <li><span class="bad">❌</span><span>Payments and sales data are disconnected / 支付与销售数据割裂，难以形成闭环</span></li>
+      <li><span class="bad">❌</span><span>Centralized data can be manipulated — brands self-report; no audit trail</span></li>
+      <li><span class="bad">❌</span><span>When companies vanish, traceability data is gone — no recourse for consumers</span></li>
+      <li><span class="bad">❌</span><span>No trusted record for second-hand flow — resale market is opaque and risky</span></li>
     </ul>
   </div>
 
   <div class="card">
-    <div class="title"><b>Solution (one-line) / 解决方案（一句话）</b></div>
-
-    <div class="b">
-      <p class="en"><code>Real‑world Action → On‑chain Proof → Automated Settlement</code></p>
-      <p class="zh"><code>真实行为 → 链上凭证 → 自动结算</code></p>
-    </div>
-
+    <div class="title"><b>Why Database-Only (No Chain) Can’t Solve This</b></div>
     <div class="b">
       <p class="en">
-        Each scan/redeem produces a verifiable on-chain event on Conflux, making sales data queryable and enabling stablecoin settlement.
+        <strong>Cross-border:</strong> Buyer and seller don’t trust the same central party. A database run by one side (or one vendor) is not trusted by the other — data can be changed, and there is no <span class="em">shared, immutable proof</span>. Trust between cross-border parties cannot be built on a single centralized database.
       </p>
-      <p class="zh">
-        每一次扫码/兑换都会在 Conflux 上生成可验证的链上事件，让销量数据可查询、可审计，并支持稳定币结算与对账自动化。
+    </div>
+    <div class="b">
+      <p class="en">
+        <strong>Second-hand:</strong> The two sides have no <span class="em">tamper-proof digital ID</span> for the product: when it was bought, whether it was repaired, whether it’s genuine. A central DB is either controlled by one side (the other won’t trust it), or by a third party that can alter data or shut down. There is no neutral, verifiable record that both buyer and seller can rely on.
+      </p>
+    </div>
+    <div class="b">
+      <p class="en">
+        On-chain: the same record is visible and unchangeable for everyone. The NFT is the product’s <span class="em">portable, unforgeable ID</span> — purchase time, transfers, and (if recorded) repair history live on a ledger neither party controls. That’s why we use the chain.
       </p>
     </div>
   </div>
 
   <div class="card">
-    <div class="title"><b>Live Demo / 在线演示</b></div>
+    <div class="title"><b>Financing Pain Point We Solve</b></div>
 
     <div class="b">
-      <p class="en">Scan‑to‑sale demo: trigger a real event and see it recorded on-chain.</p>
-      <p class="zh">扫码触发真实事件，并在链上看到记录（可现场演示）。</p>
+      <p class="en">
+        Cross-border SMEs face <span class="em">hard and expensive financing</span>, and funding chains break easily across the full trade lifecycle (pre-production, logistics, settlement). Banks and investors lack <span class="em">verifiable proof</span> of real sales and real users.
+      </p>
+    </div>
+
+    <div class="b">
+      <p class="en">
+        With FireflyQR, <span class="em">on-chain real sales, NFT ownership, and real user data</span> become auditable collateral. Merchants can use this proof to borrow from investors and banks — <span class="em">borrow and repay on demand</span>, without locking into rigid loan terms. We address: SME financing difficulty, high financing cost, and fragile trade funding chains.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Break Channel Monopoly — Direct Reach &amp; Private Domain</b></div>
+    <div class="b">
+      <p class="en">
+        Today, <span class="em">platforms monopolize distribution</span>: JD, Taobao, and similar marketplaces control the channel. Producers get thin margins; middlemen capture most of the value. Brands don’t own the customer relationship — the platform does.
+      </p>
+    </div>
+    <div class="b">
+      <p class="en">
+        With this solution, <span class="em">every scan brings the consumer into the brand’s private domain</span> (e.g. community, follow-up, repurchase flow). You get <span class="em">higher repurchase</span> and <span class="em">direct reach</span> — no need to rely on JD, Taobao, or other centralized platforms to touch the end user. Producers can retain margin and own the relationship; the middleman layer is no longer the only path to the customer.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Solution: Three Pillars</b></div>
+
+    <div class="b">
+      <p class="en"><strong>1. Anti-counterfeiting</strong> — One code per item; each NFT is minted from the <span class="em">merchant’s official contract</span>. Provenance is verifiable: the NFT’s contract address proves it came from the brand, not a counterfeiter.</p>
+    </div>
+    <div class="b">
+      <p class="en"><strong>2. Traceability &amp; anti-diversion</strong> — On every scan we capture the user’s IP, <span class="em">salt it, and store it in the database</span>. You get regional and channel analytics and can detect diversion (e.g. goods intended for region A appearing in region B).</p>
+    </div>
+    <div class="b">
+      <p class="en"><strong>3. Financing</strong> — <span class="em">Real scan volume</span>, scattered timestamps, and geographic distribution prove genuine end-user activity. Banks and investors can treat this as auditable proof for borrow-and-repay financing.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Flow (one-line)</b></div>
+
+    <div class="b">
+      <p class="en"><code>Physical Code → Validate → Gasless Mint → Success &amp; Content Unlock</code></p>
+    </div>
+
+    <div class="b">
+      <p class="en">
+        Each product gets a <span class="em">permanent, transferable digital identity</span> (NFT). Scan QR → enter address → claim NFT (gasless) → unlock Arweave content, Matrix community, and more. Secondary activation lets second-hand buyers pay 1.1 native token to transfer ownership — original sellers can reclaim their deposit and earn again on resale.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Why the QR Code Resists Copying</b></div>
+    <div class="b">
+      <p class="en">
+        The code is only visible <span class="em">after unsealing the package</span>, so it can’t be copied at scale without opening the product. When the user claims the reward (e.g. red packet), a <span class="em">post-sale countdown</span> starts and the claim is recorded (time, location, amount, SKU).
+      </p>
+    </div>
+    <div class="b">
+      <p class="en">
+        If a code is batch-copied and shared, anyone who scans it later can see <span class="em">when, where, and how much</span> was claimed, plus the <span class="em">SKU</span>. If that doesn’t match the product they’re holding (wrong SKU, already claimed, wrong region), the copied code effectively tells the customer: <strong>this is counterfeit</strong>. Copying the QR doesn’t help fakes — it exposes them.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Live Demo</b></div>
+
+    <div class="b">
+      <p class="en"><strong>MVP live</strong> at whale3070.com — real scans, real mints, real admin data.</p>
+    </div>
+    <div class="b">
+      <p class="en"><strong>In 30 seconds:</strong> Admin overview (sales, mint count, withdraw) and claim flow (scan → enter address → receive NFT). No wallet required for first claim.</p>
     </div>
 
     <div class="ctaRow">
-      <a class="cta" href="http://whale3070.com/vault_mint_nft/ec8eb74142c97311f07470ef0b6db424dec06de0858b953917e823406e28d6b1" target="_blank" rel="noopener noreferrer">
-        Open Live Demo / 打开演示
+      <a class="cta" href="http://whale3070.com/publisher-admin/overview" target="_blank" rel="noopener noreferrer">
+        Open MVP
       </a>
-</div>
+    </div>
   </div>
 
   <div class="footer">
-    GWDC submission: Track B (Lowering Blockchain Barriers) · Track C (Cross‑Border PayFi) / 双赛道提交：B 降低门槛 · C 跨境 PayFi
+    Deploy on Revive, Scale on Polkadot 2.0 — Original DApp Development
   </div>
 </section>
 
 <!-- PAGE 2 -->
 <section>
-  <h2>How It Works / 工作原理</h2>
+  <h2>How It Works</h2>
 
   <div class="b">
     <p class="en">
-      Each product (physical or digital) is bound to an on‑chain contract. When a customer scans a QR code or redeems a code, a <span class="em">real sales event</span> is generated.
-    </p>
-    <p class="zh">
-      每个实体或数字商品都会绑定到链上合约；当用户扫码/兑换时，会生成一次<span class="em">真实销售事件</span>。
+      Each physical good is bound to a hash code and an on-chain NFT. When a customer scans a QR or redeems a code, a <span class="em">verifiable claim event</span> is generated.
     </p>
   </div>
 
   <div class="card">
-    <div class="title"><b>Pipeline / 流程</b></div>
+    <div class="title"><b>Pipeline</b></div>
     <ul class="badlist" style="margin-top:0">
-      <li><span class="bad">1</span><span>📦 Real‑world scan/redeem / 现实世界扫码或兑换</span></li>
-      <li><span class="bad">2</span><span>🔗 Event recorded on Conflux eSpace (timestamped, verifiable) / Conflux eSpace 记录事件（可验证、带时间戳）</span></li>
-      <li><span class="bad">3</span><span>💰 Stablecoin settlement (USDT) / 稳定币结算（USDT）</span></li>
-      <li><span class="bad">4</span><span>📊 Queryable data for reconciliation & analytics / 可查询数据用于对账与分析</span></li>
+      <li><span class="bad">1</span><span>📦 Real-world scan or redeem (QR / link)</span></li>
+      <li><span class="bad">2</span><span>🔗 Backend validates code (one-code-one-claim) and <span class="em">captures scan IP — salted and stored in DB</span> for traceability and anti-diversion</span></li>
+      <li><span class="bad">3</span><span>💰 Gasless mint via relayer — user enters address, no wallet needed</span></li>
+      <li><span class="bad">4</span><span>🔄 Secondary activation — second-hand buyer pays 1.1 native token to transfer NFT ownership</span></li>
     </ul>
   </div>
 
   <div class="card">
-    <div class="title"><b>Web2-friendly UX / Web2 友好体验</b></div>
+    <div class="title"><b>Traceability &amp; Anti-Diversion</b></div>
     <div class="b">
       <p class="en">
-        Users do <span class="em">not</span> need wallets or native tokens. Gas is abstracted via relayers, and can be upgraded with <span class="em">EIP‑7702</span> account abstraction.
+        On each scan we record the user’s IP address, <span class="em">hash it with salt</span>, and store it in the database (privacy-safe, no raw IP retained). This gives merchants:
       </p>
-      <p class="zh">
-        用户<span class="em">无需</span>安装钱包或持有原生币；通过 relayer 进行 gas 代付，并可升级到 <span class="em">EIP‑7702</span> 账户抽象方案。
+    </div>
+    <ul class="badlist" style="margin-top:0">
+      <li><span class="bad">✔</span><span><strong>Regional analytics</strong> — See where scans happen (by region/country) to align with sales channels</span></li>
+      <li><span class="bad">✔</span><span><strong>Diversion detection</strong> — Spot when goods meant for one region or channel are activated elsewhere</span></li>
+      <li><span class="bad">✔</span><span><strong>Financing proof</strong> — Scattered timestamps + geographic spread make fake volume easy to detect; real data supports lending</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>NFT Deposit Pool &amp; Authenticity ID</b></div>
+    <div class="b">
+      <p class="en">
+        The FireflyQR RWA system has an <span class="em">NFT deposit pool that only increases, never decreases</span>. The design is inspired by the mature <span class="em">German bottle deposit (Pfand)</span> model: deposits create incentive for someone to maintain and return the asset, so the NFT stays tied to the physical good and is properly “cared for” along the chain.
+      </p>
+    </div>
+    <div class="b">
+      <p class="en">
+        Second-hand buyers use the NFT to <span class="em">verify genuine origin</span> — no need to trust the seller’s word. The NFT acts as the product’s <span class="em">authenticity ID</span>: one scan, one record, one source of truth. That simplifies verification for high-ticket goods (luxury, jewelry) so radically that dedicated <strong>LV authentication</strong> and <strong>jewelry authentication</strong> services become unnecessary: the NFT is the proof. No third-party “expert” layer required.
       </p>
     </div>
   </div>
 
   <div class="card">
-    <div class="title"><b>3‑Minute Demo Video / 3 分钟演示视频</b></div>
+    <div class="title"><b>Web2-Friendly UX</b></div>
     <div class="b">
       <p class="en">
-        Watch: <span class="em">scan → mint → dashboard update</span>. Focus on the on‑chain transaction and the dashboard change.
-      </p>
-      <p class="zh">
-        看点：<span class="em">扫码 → 铸造 → 看板实时更新</span>。重点看链上交易与看板变化是否同步发生。
+        Users do <span class="em">not</span> need wallets or native tokens for first claim. Gas is abstracted via relayers. Secondary activation requires MetaMask (or compatible wallet) to send 1.1 PAS to the contract.
       </p>
     </div>
-    <video controls preload="metadata" poster="/assets/video-cover.png">
-      <source src="/assets/whale-vault-pitch-deck.mp4" type="video/mp4" />
-      Your browser does not support the video tag.
-    </video>
+  </div>
+
+  <div class="card">
+    <div class="title"><b>Demo Video</b></div>
+    <div class="b">
+      <p class="en">
+        Watch: <span class="em">scan → mint → dashboard update</span>. Focus on on-chain events and the admin panel.
+      </p>
+    </div>
+    <div class="videoEmbed">
+      <iframe src="https://www.youtube.com/embed/qHEfyQZWpMo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
   </div>
 
   <div class="row">
-    <span class="tag">Conflux eSpace</span>
-    <span class="tag">Stablecoin Settlement</span>
-    <span class="tag">Gas Abstraction</span>
-    <span class="tag">EIP‑7702 Ready</span>
-    <span class="tag">On‑chain Reconciliation</span>
-  </div>
-
-  <div class="footer">
-    Tip / 提示：如果封面图不存在也不影响播放；建议放一张 <code>/assets/video-cover.png</code> 作为路演封面。
+    <span class="tag">Revive / Polkadot 2.0</span>
+    <span class="tag">Gasless Claim</span>
+    <span class="tag">Secondary Activation</span>
+    <span class="tag">Anti-Counterfeiting</span>
+    <span class="tag">Anti-Diversion (Scan IP)</span>
+    <span class="tag">On-Chain Financing Proof</span>
+    <span class="tag">EVM Compatible</span>
   </div>
 </section>
 
 <!-- PAGE 3 -->
 <section>
-  <h2>Why This Matters / 为什么重要</h2>
+  <h2>Why This Matters</h2>
 
   <div class="b">
     <p class="en">
-      Whale Vault targets Belt &amp; Road cross‑border distribution: publishing, branded goods, and physical merchandise exported from China to Southeast Asia, the Middle East, and beyond.
-    </p>
-    <p class="zh">
-      Whale Vault 面向“一带一路”相关的跨境分销场景：出版、品牌商品与实体货品，从中国出口到东南亚、中东等地区。
+      FireflyQR targets Belt &amp; Road cross-border distribution: publishing, branded goods, and physical merchandise exported from China to Southeast Asia, the Middle East, and beyond. We lower the Web3 barrier for non-blockchain users.
     </p>
   </div>
 
   <div class="card">
-    <div class="title"><b>What you get / 你得到什么</b></div>
+    <div class="title"><b>What You Get</b></div>
     <ul class="badlist" style="margin-top:0">
-      <li><span class="bad">✔</span><span>🌍 Verifiable regional distribution / 可验证的区域销量分布</span></li>
-      <li><span class="bad">✔</span><span>⚡ Faster reconciliation and settlement / 更快的对账与结算</span></li>
-      <li><span class="bad">✔</span><span>🔍 No reliance on self‑reported channel data / 不依赖渠道自报数据</span></li>
-      <li><span class="bad">✔</span><span>🧩 Composable with DeFi/analytics / 可组合到 DeFi 与数据分析体系</span></li>
+      <li><span class="bad">✔</span><span>🛡️ <strong>Anti-counterfeiting</strong> — One code per item; NFT from merchant’s official contract = verifiable provenance</span></li>
+      <li><span class="bad">✔</span><span>📍 <strong>Traceability &amp; anti-diversion</strong> — Scan IP captured, salted, stored in DB → regional analytics and diversion detection</span></li>
+      <li><span class="bad">✔</span><span>💳 <strong>Financing</strong> — Real sales + NFT + user data (time + geography) as proof for investors and banks — flexible borrow-and-repay</span></li>
+      <li><span class="bad">✔</span><span>🌍 Permanent on-chain traceability — no data loss when companies disappear</span></li>
+      <li><span class="bad">✔</span><span>🔄 Verifiable NFT transfer and secondary activation — trusted second-hand market</span></li>
     </ul>
   </div>
 
-  <div class="grid">
-    <div class="metric">
-      <div class="k">Proof of Execution / 执行证明</div>
-      <p class="v">Live demo + on‑chain events. Not a slide‑only concept. / 有在线演示与链上事件，不是 PPT 项目。</p>
+  <!-- 新增6格漫画卡片网格 -->
+  <div class="card" style="margin-top: 24px;">
+    <div class="title">
+      <b>Comic Story</b>
     </div>
-    <div class="metric">
-      <div class="k">Business Model / 商业模式</div>
-      <p class="v">Per‑action fee · Settlement/reconciliation fee · Enterprise integration. / 单次事件费 · 结算/对账费 · 企业集成。</p>
-    </div>
-    <div class="metric">
-      <div class="k">Why Conflux / 为什么 Conflux</div>
-      <p class="v">Low fees + EVM compatibility makes high‑frequency event recording practical. / 低成本 + EVM 兼容，适合高频记录。</p>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="title"><b>Open Source / 开源仓库</b></div>
     <div class="b">
-      <p class="en">Full implementation (contracts, backend, demo frontend):</p>
-      <p class="zh">完整实现（合约、后端、前端演示）：</p>
+      <p class="en">Explore the real-world application of FireflyQR through a visual comic story — click each scene to learn more.</p>
     </div>
-    <p style="margin:0">
-      👉 <a href="https://github.com/whale3070/GWDC-Hackathon-Whale-Vault" target="_blank" rel="noopener noreferrer">
-        github.com/whale3070/GWDC-Hackathon-Whale-Vault
+    
+    <!-- 6格漫画卡片网格 -->
+    <div class="comic-grid">
+      <!-- 卡片1： -->
+      <a href="rabbit/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="rabbit/1.png" alt="Scene 1: Trust Crisis">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 1</span>
+          <h3 class="comic-card-title">The Little Rabbit's Anti-Counterfeiting Adventure</h3>
+          <p class="comic-card-desc">A little rabbit, who once got sick from drinking counterfeit wine, avoids future risks of buying refilled fake wine after the winery adopts FireflyQR, which allows the rabbit to scan a QR code (by unwrapping preserved flower packaging) to get a red envelope, claim an NFT, and verify the wine's authenticity.</p>
+        </div>
       </a>
-    </p>
-  </div>
 
-  <div class="b" style="margin-top:18px">
-    <p class="en"><span class="em">Real sales. Real data. Real settlement.</span></p>
-    <p class="zh"><span class="em">真实销量 · 真实数据 · 真实结算</span></p>
-  </div>
+      <!-- 卡片2： -->
+      <a href="membership/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="membership/1.png" alt="Scene 2: The Little Rabbit's FireflyQR Adventure: NFT Membership Journey">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 2</span>
+          <h3 class="comic-card-title">The Little Rabbit's FireflyQR Adventure: NFT Membership Journey</h3>
+          <p class="comic-card-desc">After suffering from drinking counterfeit wine, the little rabbit discovers the winery's FireflyQR system that not only verifies genuine wine and issues NFTs but also lets it earn rewards, upgrade NFT levels by completing daily scan tasks, and finally turn the NFT into a core fan membership card with big discounts, and the rabbit shares this great system with all its friends to keep them from buying fake wine too.</p>
+        </div>
+      </a>
 
-  <div class="footer">
-    Built on Conflux · Dual Track Submission (B + C) / 基于 Conflux · 双赛道提交（B + C）
+      <!-- 卡片3： -->
+      <a href="Fluffy/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="Fluffy/1.png" alt="Scene 3">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 3</span>
+          <h3 class="comic-card-title">The Fluffy Rabbit’s FireflyQR Commission Adventure</h3>
+          <p class="comic-card-desc">A fluffy rabbit discovers FireflyQR products make its fur silky, shares the QR code with family, and earns commissions while shopping authentic goods.</p>
+        </div>
+      </a>
+    
+            <!-- 卡片4 -->
+      <a href="wolf/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="wolf/1.png" alt="Scene 4: On-chain Provenance">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 4</span>
+          <h3 class="comic-card-title">The Big Gray Wolf’s FireflyQR Money-Saving Hack</h3>
+          <p class="comic-card-desc">A reformed big gray wolf, once a hunter, uses FireflyQR to buy snacks at wholesale prices directly from factories, saving money and enjoying more treats with a rabbit’s help.</p>
+        </div>
+      </a>
+
+      <!-- 卡片5 -->
+      <a href="monkey/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="monkey/1.png" alt="Scene 5: Factory Traceability">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 5</span>
+          <h3 class="comic-card-title">The Monkey’s Peach Factory: FireflyQR’s Cash Flow Rescue</h3>
+          <p class="comic-card-desc">A peach factory owner monkey uses FireflyQR’s on-chain verified sales data to secure quick bank financing, solving cash flow issues and expanding his business.</p>
+        </div>
+      </a>
+
+
+
+      <!-- 卡片6：Verifiable Trust -->
+      <a href="bat/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="bat/1.png" alt="Scene 6: Verifiable Trust">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 6</span>
+          <h3 class="comic-card-title">The Bat's Trustworthy Watch Quest</h3>
+          <p class="comic-card-desc">The little bat exposes a vain raccoon’s lies about owning luxury watches by checking if the raccoon is in the official NFT holder group, proving that real ownership cannot be faked.</p>
+        </div>
+      </a>
+
+      <!-- 卡片7： -->
+      <a href="bat2/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="bat2/1.png" alt="Scene7">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 7</span>
+          <h3 class="comic-card-title">The Little Bat and the Vain Raccoon</h3>
+          <p class="comic-card-desc">a single-mother gazelle, who balances childcare with a new career through FireflyQR’s 24-hour livestreaming system, earning a "base salary + commission" by building trust with fans through honest service.</p>
+        </div>
+      </a>      
+
+      <!-- 卡片8： -->
+      <a href="antelope/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+            <div class="comic-card-img">
+              <img src="antelope/1.png" alt="Scene7">
+            </div>
+            <div class="comic-card-content">
+              <span class="comic-card-badge">Scene 8</span>
+              <h3 class="comic-card-title">Sophie is Livestreaming</h3>
+              <p class="comic-card-desc">a single-mother gazelle, who balances childcare with a new career through FireflyQR’s 24-hour livestreaming system, earning a "base salary + commission" by building trust with fans through honest service.</p>
+            </div>
+      </a>
+
+      <!-- 卡片9： -->
+      <a href="fox/index.html" class="comic-card" target="_blank" rel="noopener noreferrer">
+        <div class="comic-card-img">
+          <img src="fox/1.png" alt="Scene9">
+        </div>
+        <div class="comic-card-content">
+          <span class="comic-card-badge">Scene 9</span>
+          <h3 class="comic-card-title">The Fox's Grape Farm: Tracking Fraud on the Blockchain</h3>
+          <p class="comic-card-desc">The little fox, who runs a global wine business, uses FireflyQR (with NFT provenance) to track wine shipments and expose the weasel's illegal reselling of low-priced wine for profit, restoring transparency to the supply chain.</p>
+        </div>
+    </a>
+
+    </div>
   </div>
 </section>
-
-</body>
-</html>
+</body></html>
