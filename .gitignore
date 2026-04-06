@@ -6,7 +6,15 @@ cache/
 .DS_Store
 # 如果 backend 下也有 node_modules
 backend/node_modules/
+backend/
 public/whale-vault-pitch-deck.mp4
+# Large GeoIP database (optional public mirror; do not commit binary)
+public/downloads/*.mmdb
+public/downloads/*.dat
+public/downloads/*.tar.gz
+
+# Large toolchain bundle (optional local mirror; keep at repo root or public/downloads)
+foundry-nightly.tar.gz
 
 # Python 虚拟环境（venv 整目录忽略，避免提交 site-packages 等）
 backend/venv/
