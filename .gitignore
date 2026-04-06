@@ -48,3 +48,21 @@ public/membership/
 public/monkey/
 public/rabbit/
 public/wolf/
+
+# --- Guard: large binaries / local toolchains (avoid repo history bloat) ---
+*.deb
+*.rpm
+*.dmg
+*.pkg
+*.msi
+*.mmdb
+qqwry.dat
+cloudflared*
+.foundry/
+.cache/
+
+# Python venv anywhere (repo may add scripts outside backend/)
+.venv/
+venv/
+__pycache__/
+*.py[cod]

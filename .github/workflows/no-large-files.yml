@@ -1,0 +1,28 @@
+name: No large tracked files
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if any tracked file exceeds 5MB
+        run: |
+          set -euo pipefail
+          max=5242880
+          bad=0
+          while IFS=$'\t' read -r meta path || [ -n "$meta" ]; do
+            [ -z "${path:-}" ] && continue
+            echo "$meta" | grep -q ' blob ' || continue
+            size=$(echo "$meta" | awk '{print $4}')
+            case "$size" in ''|*[!0-9]*) continue ;; esac
+            if [ "$size" -gt "$max" ]; then
+              echo "::error::Too large for normal git history: $path ($size bytes). Use Git LFS, host externally, or add to .gitignore."
+              bad=1
+            fi
+          done < <(git ls-tree -r -l HEAD)
+          exit "$bad"
