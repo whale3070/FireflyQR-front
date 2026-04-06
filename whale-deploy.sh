@@ -124,6 +124,26 @@ sudo rm -rf "$TMP_DIR"
 sudo mkdir -p "$TMP_DIR"
 sudo cp -r "$DIST_DIR/." "$TMP_DIR/"
 
+# 大文件 /downloads/：构建会把 public/downloads 同步进 dist；若未进 dist 则从源码树补拷
+for _dl in GeoLite2-City.mmdb qqwry.dat foundry-nightly.tar.gz; do
+  if [ -f "$TMP_DIR/downloads/$_dl" ]; then
+    continue
+  fi
+  if [ -f "$SOURCE_DIR/public/downloads/$_dl" ]; then
+    echo "📦 补充同步 $_dl 到站点 /downloads/（来自 public/downloads）"
+    sudo mkdir -p "$TMP_DIR/downloads"
+    sudo cp -f "$SOURCE_DIR/public/downloads/$_dl" "$TMP_DIR/downloads/"
+  elif [ -f "$SOURCE_DIR/backend/$_dl" ]; then
+    echo "📦 补充同步 $_dl 到站点 /downloads/（来自 backend）"
+    sudo mkdir -p "$TMP_DIR/downloads"
+    sudo cp -f "$SOURCE_DIR/backend/$_dl" "$TMP_DIR/downloads/"
+  elif [ -f "$SOURCE_DIR/$_dl" ]; then
+    echo "📦 补充同步 $_dl 到站点 /downloads/（来自项目根）"
+    sudo mkdir -p "$TMP_DIR/downloads"
+    sudo cp -f "$SOURCE_DIR/$_dl" "$TMP_DIR/downloads/"
+  fi
+done
+
 # 可选：把 public/403.html 放到站点根（如果你想直接 /403.html 访问）
 if [ "$COPY_403_HTML" = "true" ] && [ -f "$SOURCE_DIR/public/403.html" ]; then
   echo "📄 同步 public/403.html 到站点根（/403.html）"
